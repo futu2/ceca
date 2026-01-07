@@ -65,7 +65,7 @@ library
     exposed-modules:  Ceca
                     , Ceca.AST
                     , Ceca.Parser
-                    , Ceca.TypeInfer
+                    , Ceca.TypeChecker
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -76,7 +76,8 @@ library
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.21.0.0,
                       containers,
-                      attoparsec
+                      text,
+                      megaparsec,
 
     -- Directories containing source files.
     hs-source-dirs:   src
