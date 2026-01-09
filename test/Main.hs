@@ -1,4 +1,9 @@
-module Main (main) where
+module Main where
+
+import TypeTest ( typeTestMain )
+import ExprTest (patternExprTestMain)
 
 main :: IO ()
-main = putStrLn "Test suite not yet implemented."
+main = do
+    typeTestMain
+    patternExprTestMain

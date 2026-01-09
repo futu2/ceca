@@ -9,7 +9,7 @@ import Data.Data ( Data )
 data Span a = MkSpan
   { spanStart :: SourcePos
   , spanEnd :: SourcePos
-  , node :: a
+  , spanNode :: a
   }
   deriving (Eq, Show, Data)
 
