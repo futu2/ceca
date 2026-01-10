@@ -36,23 +36,23 @@ instance Types Type where
     ftv = ftv . spanNode
 
 instance Types TypeNode where
-    apply s (TVar n) = case Map.lookup n s of
-                         Nothing -> TVar n
-                         Just t -> typeNode t
-    apply s (TCon n) = TCon n
-    apply s (TArrow t1 t2) = TArrow (apply s t1) (apply s t2)
-    apply s (TTuple ts) = TTuple (map (apply s) ts)
-    apply s (TArray t) = TArray (apply s t)
-    apply s (TRecordEmpty) = TRecordEmpty
-    apply s (TRecordExtend n t r) = TRecordExtend n (apply s t) (apply s r)
+     apply s (TVar n) = case Map.lookup n s of
+                          Nothing -> TVar n
+                          Just t -> typeNode t
+     apply s (TCon n) = TCon n
+     apply s (TArrow t1 t2) = TArrow (apply s t1) (apply s t2)
+     apply s (TTuple ts) = TTuple (map (apply s) ts)
+     apply s (TArray t) = TArray (apply s t)
+     apply s (TRecordEmpty) = TRecordEmpty
+     apply s (TRecordExtend n t r) = TRecordExtend n (apply s t) (apply s r)
 
-    ftv (TVar n) = Set.singleton n
-    ftv (TCon _) = Set.empty
-    ftv (TArrow t1 t2) = ftv t1 `Set.union` ftv t2
-    ftv (TTuple ts) = foldr (Set.union . ftv) Set.empty ts
-    ftv (TArray t) = ftv t
-    ftv (TRecordEmpty) = Set.empty
-    ftv (TRecordExtend _ t r) = ftv t `Set.union` ftv r
+     ftv (TVar n) = Set.singleton n
+     ftv (TCon _) = Set.empty
+     ftv (TArrow t1 t2) = ftv t1 `Set.union` ftv t2
+     ftv (TTuple ts) = foldr (Set.union . ftv) Set.empty ts
+     ftv (TArray t) = ftv t
+     ftv (TRecordEmpty) = Set.empty
+     ftv (TRecordExtend _ t r) = ftv t `Set.union` ftv r
 
 instance Types Scheme where
     apply s (Forall as t) = Forall as (apply (foldr Map.delete s as) t)

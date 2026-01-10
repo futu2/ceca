@@ -12,6 +12,10 @@ import Ceca.Parser.Pattern (parsePattern)
 import Ceca.Parser.Type
 import Control.Monad (guard, void)
 
+-- Helper for reverse application (like Haskell's &)
+reverseBinary :: Expr -> Expr -> Expr
+reverseBinary e1 e2 = MkSpan (spanStart e1) (spanEnd e2) (EApp e2 e1)
+
 -- Helper for binary application
 binary :: Expr -> Expr -> Expr
 binary e1 e2 = MkSpan (spanStart e1) (spanEnd e2) (EApp e1 e2)
@@ -19,7 +23,7 @@ binary e1 e2 = MkSpan (spanStart e1) (spanEnd e2) (EApp e1 e2)
 -- Operator table for infix operators
 operatorTable :: [[Operator Parser Expr]]
 operatorTable =
-  [ [ InfixL (binary <$ symbol "&") ]
+  [ [ InfixL (reverseBinary <$ symbol "&") ]
   , [ InfixR (binary <$ symbol "$") ]
   ]
 
@@ -32,9 +36,9 @@ parseTerm = choice
   , try (withSpan parseRecordExpr)
   , try (withSpan parseTupleExpr)
   , try (withSpan parseArrayExpr)
-  , try (withSpan parseAnnotExpr)
   , try (withSpan parseImportExpr)
-  , withSpan parseAppExpr
+  , try parseProjExpr
+  , try (withSpan parseAppExpr)
   ]
 
 parseAtomicExpr :: Parser Expr
@@ -49,7 +53,7 @@ parseAtomicExpr =
 parseProjExpr :: Parser Expr
 parseProjExpr = do
   expr <- parseAtomicExpr
-  more <- many parseProjSuffix
+  more <- some parseProjSuffix
   return $ foldl' (\e f -> f e) expr more
  where
   parseProjSuffix :: Parser (Expr -> Expr)
@@ -154,7 +158,7 @@ parseLetExpr = do
 
 parseAnnotExpr :: Parser ExprNode
 parseAnnotExpr = do
-  expr <- parseProjExpr
+  expr <- makeExprParser parseTerm operatorTable
   _ <- symbol ":"
   typ <- parseType
   return $ EAnnot expr typ
@@ -178,4 +182,7 @@ parseExprNode :: Parser ExprNode
 parseExprNode = fmap spanNode parseExpr
 
 parseExpr :: Parser Expr
-parseExpr = makeExprParser parseTerm operatorTable
+parseExpr = choice
+  [ try (withSpan parseAnnotExpr)
+  , makeExprParser parseTerm operatorTable
+  ]

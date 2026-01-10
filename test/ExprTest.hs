@@ -26,6 +26,7 @@ patternExprTestMain = do
         , ("prop_parseArrayExprs", prop_parseArrayExprs)
         , ("prop_parseRecordExprs", prop_parseRecordExprs)
         , ("prop_parseApplication", prop_parseApplication)
+        , ("prop_parseInfix", prop_parseInfix)
         , ("prop_parseLambda", prop_parseLambda)
         , ("prop_parseLet", prop_parseLet)
         , ("prop_parseAnnotation", prop_parseAnnotation)
@@ -50,6 +51,8 @@ runUnitTestsExpr = do
   test_parseLambdaExpr
   test_parseApplication
   test_parseApplicationLambdaToLambda
+  test_parseInfix
+  test_parseProjection
   test_parseLetExpr
   test_parseExtendRestrict
   test_parseRecordPattern
@@ -197,6 +200,13 @@ genApplication = do
   args <- Gen.list (Range.linear 1 3) genSimpleExpr
   return $ T.unwords (func : args)
 
+genInfix :: Gen Text
+genInfix = do
+  e1 <- genSimpleExpr
+  op <- Gen.element ["&", "$"]
+  e2 <- genSimpleExpr
+  return $ e1 <> " " <> op <> " " <> e2
+
 genLambda :: Gen Text
 genLambda = do
   pat <- genPattern
@@ -337,6 +347,17 @@ prop_parseApplication = property $ do
     Right other -> do
       annotateShow other
       failure
+    Left err -> do
+      annotateShow err
+      failure
+
+prop_parseInfix :: Property
+prop_parseInfix = property $ do
+  expr <- forAll genInfix
+  let result = parse parseProgram "test" expr
+  annotateShow result
+  case result of
+    Right _ -> success
     Left err -> do
       annotateShow err
       failure
@@ -695,6 +716,38 @@ test_parseApplicationLambdaToLambda = do
       checkLambda arg "test_parseApplicationLambdaToLambda failed: Argument"
     Right other -> error $ "test_parseApplicationLambdaToLambda failed: Expected EApp, got: " ++ show other
     Left err -> error $ "test_parseApplicationLambdaToLambda failed: " ++ errorBundlePretty err
+
+test_parseInfix :: IO ()
+test_parseInfix = do
+  -- Test & (left associative, reverse application)
+  let result1 = parse parseProgram "test" "x & y"
+  case result1 of
+    Right (MkSpan _ _ (EApp (MkSpan _ _ (EVar "y")) (MkSpan _ _ (EVar "x")))) -> return ()
+    Right other -> error $ "test_parseInfix failed for &: Expected EApp y x, got: " ++ show other
+    Left err -> error $ "test_parseInfix failed for &: " ++ errorBundlePretty err
+
+  -- Test $ (right associative)
+  let result2 = parse parseProgram "test" "x $ y"
+  case result2 of
+    Right (MkSpan _ _ (EApp (MkSpan _ _ (EVar "x")) (MkSpan _ _ (EVar "y")))) -> return ()
+    Right other -> error $ "test_parseInfix failed for $: Expected EApp x y, got: " ++ show other
+    Left err -> error $ "test_parseInfix failed for $: " ++ errorBundlePretty err
+
+test_parseProjection :: IO ()
+test_parseProjection = do
+  -- Test simple projection
+  let result = parse parseProgram "test" "x.y"
+  case result of
+    Right (MkSpan _ _ (EProj (MkSpan _ _ (EVar "x")) "y")) -> return ()
+    Right other -> error $ "test_parseProjection failed: Expected EProj x y, got: " ++ show other
+    Left err -> error $ "test_parseProjection failed: " ++ errorBundlePretty err
+
+  -- Test projection with parentheses
+  let result2 = parse parseProgram "test" "(x).y"
+  case result2 of
+    Right (MkSpan _ _ (EProj (MkSpan _ _ (EVar "x")) "y")) -> return ()
+    Right other -> error $ "test_parseProjection failed for parentheses: Expected EProj x y, got: " ++ show other
+    Left err -> error $ "test_parseProjection failed for parentheses: " ++ errorBundlePretty err
 
 test_parseLetExpr :: IO ()
 test_parseLetExpr = do

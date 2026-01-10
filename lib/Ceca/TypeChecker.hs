@@ -143,9 +143,16 @@ inferExpr e = case spanNode e of
             t = head (map (apply s) ts)  -- assume all same, but for simplicity
         return (s, MkSpan (initialPos "dummy") (initialPos "dummy") (TArray t))
     EAnnot e ty -> do
-        (s1, t) <- inferExpr e
-        s2 <- unify t ty
-        return (s2 `compose` s1, apply s2 ty)
+         (s1, t) <- inferExpr e
+         s2 <- unify t ty
+         return (s2 `compose` s1, apply s2 ty)
+    EProj e l -> do
+         (s1, t1) <- inferExpr e
+         tv <- fresh
+         rowVar <- fresh
+         let rowType = MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l tv rowVar)
+         s2 <- unify t1 rowType
+         return (s2 `compose` s1, apply s2 tv)
     _ -> error "not implemented"
 
 inferPat :: Pattern -> TI (Subst, Type, Env)

@@ -24,18 +24,34 @@
           "containers"
           "megaparsec"
           "mtl"
+          "parser-combinators"
+          "text"
+          "uniplate"
+        ];
+      };
+
+      executable = {
+        enable = true;
+        dependencies = [
+          "containers"
+          "megaparsec"
+          "mtl"
+          "parser-combinators"
           "text"
         ];
       };
 
-      executable.enable = true;
-
       test = {
         enable = true;
         dependencies = [
+          "containers"
           "hedgehog >= 1.1 && < 1.5"
+          "megaparsec"
+          "mtl"
+          "parser-combinators"
           "tasty ^>= 1.4"
           "tasty-hedgehog >= 1.3 && < 1.5"
+          "text"
         ];
       };
 

@@ -19,14 +19,14 @@ main = do
 
 processFile :: FilePath -> IO ()
 processFile file = do
-  content <- readFile file
-  case runParser parseProgram file (pack content) of
-    Left parseErr -> putStrLn $ "Parse error: " ++ show parseErr
-    Right expr -> case typeCheck expr of
-      Left typeErr -> putStrLn $ "Type error: " ++ show typeErr
-      Right ty -> do
-        putStrLn $ "Type: " ++ show ty
-        let core = desugar expr
-            normalized = normalize core
-        putStrLn $ "Normalized core AST:"
-        putStrLn $ show (unCore normalized)
+   content <- readFile file
+   case runParser parseProgram file (pack content) of
+     Left parseErr -> putStrLn $ "Parse error: " ++ show parseErr
+     Right expr -> case typeCheck expr of
+       Left typeErr -> putStrLn $ "Type error: " ++ show typeErr
+       Right ty -> do
+         putStrLn $ "Type: " ++ show ty
+         let core = desugar expr
+             normalized = normalize core
+         putStrLn $ "Normalized core AST:"
+         putStrLn $ show (unCore normalized)

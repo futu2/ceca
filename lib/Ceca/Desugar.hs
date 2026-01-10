@@ -18,18 +18,18 @@ validateCore e = case spanNode e of
         PVar _ -> validateCoreBody e
         _ -> False
     _ -> all validateCore (subExprs e)
-  where subExprs (MkSpan _ _ node) = case node of
-            EApp e1 e2 -> [e1, e2]
-            EAbs _ body -> [body]
-            ELet _ _ e1 e2 -> [e1, e2]
-            ERecord fields -> map snd fields
-            ETuple es -> es
-            EArray es -> es
-            EProj e _ -> [e]
-            EAnnot e _ -> [e]
-            _ -> []
-        validateCoreBody (MkSpan _ _ (EAbs _ body)) = validateCore body
-        validateCoreBody _ = True
+   where subExprs (MkSpan _ _ node) = case node of
+             EApp e1 e2 -> [e1, e2]
+             EAbs _ body -> [body]
+             ELet _ _ e1 e2 -> [e1, e2]
+             ERecord fields -> map snd fields
+             ETuple es -> es
+             EArray es -> es
+             EProj e _ -> [e]
+             EAnnot e _ -> [e]
+             _ -> []
+         validateCoreBody (MkSpan _ _ (EAbs _ body)) = validateCore body
+         validateCoreBody _ = True
 
 unCore :: CoreExpr -> Expr
 unCore (CoreExpr e) = e
