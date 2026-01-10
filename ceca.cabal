@@ -110,7 +110,9 @@ executable ceca
     -- Other library packages from which modules are imported.
     build-depends:
         base ^>=4.20.0.0,
-        ceca
+        ceca,
+        megaparsec,
+        text
 
     -- Directories containing source files.
     hs-source-dirs:   app

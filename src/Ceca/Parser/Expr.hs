@@ -9,14 +9,14 @@ import Text.Megaparsec
 import Ceca.Parser.Basic
 import Ceca.Parser.Pattern (parsePattern)
 import Ceca.Parser.Type
-import Control.Monad (void)
+import Control.Monad (guard, void)
 
 -- Parser for expressions
 parseExprNode :: Parser ExprNode
 parseExprNode = do
   choice
-    [ try parseLetExpr
-    , try parseLambdaExpr
+    [ try parseLambdaExpr
+    , try parseLetExpr
     , try parseExtendRestrictExpr
     , try parseRecordExpr
     , try parseTupleExpr
@@ -97,24 +97,25 @@ parseExtendRestrictExpr = braces $ do
 
 parseRecordExpr :: Parser ExprNode
 parseRecordExpr = braces $ do
-    -- Check if record is empty
-    isEmpty <- optional (lookAhead (void (symbol "}")))
-    case isEmpty of
-        Just _ -> return $ ERecord []
-        Nothing -> do
-            fields <- parseRecordField `sepBy` symbol ","
-            optional (symbol ",")
-            return $ ERecord fields
-  where
-    parseRecordField = do
-        name <- identifier
-        symbol "="
-        expr <- parseExpr
-        return (name, expr)
+  -- Check if record is empty
+  isEmpty <- optional (lookAhead (void (symbol "}")))
+  case isEmpty of
+    Just _ -> return $ ERecord []
+    Nothing -> do
+      fields <- parseRecordField `sepBy` symbol ","
+      optional (symbol ",")
+      return $ ERecord fields
+ where
+  parseRecordField = do
+    name <- identifier
+    symbol "="
+    expr <- parseExpr
+    return (name, expr)
 
 parseTupleExpr :: Parser ExprNode
 parseTupleExpr = do
   exprs <- parens (parseExpr `sepBy1` symbol ",")
+  guard $ length exprs > 1
   return $ ETuple exprs
 
 parseArrayExpr :: Parser ExprNode
@@ -149,15 +150,18 @@ parseAnnotExpr = do
 
 parseAppExpr :: Parser ExprNode
 parseAppExpr = do
-    func <- parseAtomicExpr
-    args <- many parseAtomicExpr
-    let resultExpr = foldl'
-            (\f arg -> 
-                let start = spanStart f
-                    end = spanEnd arg
-                 in MkSpan start end (EApp f arg))
-            func args
-    return $ spanNode resultExpr
+  func <- parseAtomicExpr
+  args <- many parseAtomicExpr
+  let resultExpr =
+        foldl'
+          ( \f arg ->
+              let start = spanStart f
+                  end = spanEnd arg
+               in MkSpan start end (EApp f arg)
+          )
+          func
+          args
+  return $ spanNode resultExpr
 
 parseExpr :: Parser Expr
 parseExpr = withSpan parseExprNode
