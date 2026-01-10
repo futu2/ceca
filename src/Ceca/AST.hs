@@ -5,6 +5,7 @@ module Ceca.AST where
 import Data.Text (Text)
 import Text.Megaparsec.Pos (SourcePos)
 import Data.Data ( Data )
+import Data.Generics.Uniplate.Direct
 
 data Span a = MkSpan
   { spanStart :: SourcePos

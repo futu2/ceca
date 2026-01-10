@@ -70,18 +70,23 @@ library
                     , Ceca.Parser.Pattern
                     , Ceca.Parser.Expr
                     , Ceca.TypeChecker
+                    , Ceca.Types
+                    , Ceca.Desugar
+                    , Ceca.Normalizer
 
     -- Modules included in this library but not exported.
     -- other-modules:
 
     -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
+    other-extensions: TypeSynonymInstances
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.21.0.0,
+    build-depends:    base ^>=4.20.0.0,
                       containers,
                       text,
                       megaparsec,
+                      mtl,
+                      uniplate,
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -104,7 +109,7 @@ executable ceca
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.21.0.0,
+        base ^>=4.20.0.0,
         ceca
 
     -- Directories containing source files.
@@ -123,6 +128,9 @@ test-suite ceca-test
     -- Modules included in this executable, other than Main.
     other-modules: TypeTest
                    ExprTest
+                   TypeCheckerTest
+                   DesugarTest
+                   NormalizerTest
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -138,8 +146,10 @@ test-suite ceca-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.21.0.0,
+        base ^>=4.20.0.0,
         ceca,
         hedgehog,
         megaparsec,
+        tasty,
+        tasty-hedgehog,
         text,
