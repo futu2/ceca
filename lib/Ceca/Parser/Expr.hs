@@ -47,6 +47,7 @@ parseAtomicExpr =
     choice
       [ ELit <$> parseLiteral
       , EVar <$> identifier
+      , try parseRecordExpr
       , parens parseExprNode
       ]
 

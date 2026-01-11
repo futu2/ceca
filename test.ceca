@@ -1,1 +1,1 @@
-42 & (x => x)
+(x=>x) $ {name = "yahoo1"} & (x => x.name)

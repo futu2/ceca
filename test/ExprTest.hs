@@ -51,6 +51,7 @@ runUnitTestsExpr = do
   test_parseLambdaExpr
   test_parseApplication
   test_parseApplicationLambdaToLambda
+  test_parseApplicationLambdaToRecord
   test_parseInfix
   test_parseProjection
   test_parseLetExpr
@@ -716,6 +717,37 @@ test_parseApplicationLambdaToLambda = do
       checkLambda arg "test_parseApplicationLambdaToLambda failed: Argument"
     Right other -> error $ "test_parseApplicationLambdaToLambda failed: Expected EApp, got: " ++ show other
     Left err -> error $ "test_parseApplicationLambdaToLambda failed: " ++ errorBundlePretty err
+
+test_parseApplicationLambdaToRecord :: IO ()
+test_parseApplicationLambdaToRecord = do
+  let result = parse parseProgram "test" "(x => x.name) {name = \"yahoo\"}"
+  case result of
+    Right (MkSpan _ _ (EApp func arg)) -> do
+      -- Check function is lambda x => x.name
+      case spanNode func of
+        EAbs pat body -> do
+          case spanNode pat of
+            PVar "x" -> return ()
+            _ -> error "test_parseApplicationLambdaToRecord failed: Lambda pattern should be x"
+          case spanNode body of
+            EProj e "name" -> case spanNode e of
+              EVar "x" -> return ()
+              _ -> error "test_parseApplicationLambdaToRecord failed: Projection should be on x"
+            _ -> error "test_parseApplicationLambdaToRecord failed: Lambda body should be x.name"
+        _ -> error "test_parseApplicationLambdaToRecord failed: Function should be lambda"
+      -- Check argument is record {name = "yahoo"}
+      case spanNode arg of
+        ERecord fields -> do
+          if length fields /= 1
+            then error $ "test_parseApplicationLambdaToRecord failed: Record should have 1 field, got " ++ show (length fields)
+            else do
+              let [("name", val)] = fields
+              case spanNode val of
+                ELit (LString "yahoo") -> return ()
+                _ -> error "test_parseApplicationLambdaToRecord failed: Field value should be \"yahoo\""
+        _ -> error "test_parseApplicationLambdaToRecord failed: Argument should be record"
+    Right other -> error $ "test_parseApplicationLambdaToRecord failed: Expected EApp, got: " ++ show other
+    Left err -> error $ "test_parseApplicationLambdaToRecord failed: " ++ errorBundlePretty err
 
 test_parseInfix :: IO ()
 test_parseInfix = do

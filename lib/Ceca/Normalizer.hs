@@ -2,6 +2,7 @@ module Ceca.Normalizer where
 
 import Data.Text (Text)
 import qualified Data.Set as Set
+import Data.List (lookup)
 import Ceca.AST
 import Ceca.Desugar
 
@@ -9,20 +10,21 @@ normalize :: CoreExpr -> CoreExpr
 normalize (CoreExpr e) = CoreExpr $ normalizeExpr e
 
 normalizeExpr :: Expr -> Expr
-normalizeExpr e = case spanNode e of
-    EApp e1 e2 -> case spanNode (normalizeExpr e1) of
-        EAbs (MkSpan _ _ (PVar x)) body -> normalizeExpr $ substitute x (normalizeExpr e2) body
+normalizeExpr e = case spanNode e of {
+    EApp e1 e2 -> case spanNode (normalizeExpr e1) of {
+        EAbs (MkSpan _ _ (PVar x)) body -> normalizeExpr $ substitute x (normalizeExpr e2) body ;
         _ -> let e1' = normalizeExpr e1
                  e2' = normalizeExpr e2
              in e { spanNode = EApp e1' e2' }
-    EAbs pat body -> e { spanNode = EAbs pat (normalizeExpr body) }
-    ELet x mty e1 e2 -> e { spanNode = ELet x mty (normalizeExpr e1) (normalizeExpr e2) }
-    ERecord fields -> e { spanNode = ERecord (map (\(l, ex) -> (l, normalizeExpr ex)) fields) }
-    ETuple es -> e { spanNode = ETuple (map normalizeExpr es) }
-    EArray es -> e { spanNode = EArray (map normalizeExpr es) }
-    EProj ex l -> e { spanNode = EProj (normalizeExpr ex) l }
-    EAnnot ex ty -> e { spanNode = EAnnot (normalizeExpr ex) ty }
-    _ -> e
+        } ;
+    EAbs pat body -> e { spanNode = EAbs pat (normalizeExpr body) } ;
+    ELet x mty e1 e2 -> e { spanNode = ELet x mty (normalizeExpr e1) (normalizeExpr e2) } ;
+    ERecord fields -> e { spanNode = ERecord (map (\(l, ex) -> (l, normalizeExpr ex)) fields) } ;
+    ETuple es -> e { spanNode = ETuple (map normalizeExpr es) } ;
+    EArray es -> e { spanNode = EArray (map normalizeExpr es) } ;
+    EProj ex l -> let ex' = normalizeExpr ex in case spanNode ex' of { ERecord fields -> case lookup l fields of { Just val -> normalizeExpr val ; Nothing -> e { spanNode = EProj ex' l } } ; _ -> e { spanNode = EProj ex' l } } ;
+    EAnnot ex ty -> e { spanNode = EAnnot (normalizeExpr ex) ty } ;
+    _ -> e }
 
 substitute :: Text -> Expr -> Expr -> Expr
 substitute x replacement e = case spanNode e of

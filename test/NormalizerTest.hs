@@ -11,7 +11,8 @@ import Text.Megaparsec.Pos (initialPos)
 
 normalizerTests :: TestTree
 normalizerTests = testGroup "Normalizer" [
-    testProperty "identity application" testIdentityApplication
+    testProperty "identity application" testIdentityApplication,
+    testProperty "record projection" testRecordProjection
   ]
 
 testIdentityApplication :: Property
@@ -25,4 +26,19 @@ testIdentityApplication = property $ do
         normalized = normalize core
     case coreExpr (unCore normalized) of
         Just _ -> success
+        Nothing -> failure
+
+testRecordProjection :: Property
+testRecordProjection = property $ do
+    let pat = MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "x"))
+        body = MkSpan (initialPos "dummy") (initialPos "dummy") (EProj (MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))) (pack "name"))
+        lam = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body)
+        rec = MkSpan (initialPos "dummy") (initialPos "dummy") (ERecord [(pack "name", MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LString (pack "yahoo"))))])
+        e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lam rec)
+        core = desugar e
+        normalized = normalize core
+    case coreExpr (unCore normalized) of
+        Just (CoreExpr innerExpr) -> case spanNode innerExpr of
+            ELit (LString s) | s == pack "yahoo" -> success
+            _ -> failure
         Nothing -> failure
