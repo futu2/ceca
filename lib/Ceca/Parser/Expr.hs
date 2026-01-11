@@ -3,9 +3,9 @@
 module Ceca.Parser.Expr where
 
 import Ceca.AST
+import Control.Monad.Combinators.Expr
 import Data.Text (Text)
 import Text.Megaparsec
-import Control.Monad.Combinators.Expr
 
 import Ceca.Parser.Basic
 import Ceca.Parser.Pattern (parsePattern)
@@ -23,23 +23,24 @@ binary e1 e2 = MkSpan (spanStart e1) (spanEnd e2) (EApp e1 e2)
 -- Operator table for infix operators
 operatorTable :: [[Operator Parser Expr]]
 operatorTable =
-  [ [ InfixL (reverseBinary <$ symbol "&") ]
-  , [ InfixR (binary <$ symbol "$") ]
+  [ [InfixL (reverseBinary <$ symbol "&")]
+  , [InfixR (binary <$ symbol "$")]
   ]
 
 -- Parser for expressions without infix
 parseTerm :: Parser Expr
-parseTerm = choice
-  [ try (withSpan parseLambdaExpr)
-  , try (withSpan parseLetExpr)
-  , try (withSpan parseExtendRestrictExpr)
-  , try (withSpan parseRecordExpr)
-  , try (withSpan parseTupleExpr)
-  , try (withSpan parseArrayExpr)
-  , try (withSpan parseImportExpr)
-  , try parseProjExpr
-  , try (withSpan parseAppExpr)
-  ]
+parseTerm =
+  choice
+    [ try (withSpan parseLambdaExpr)
+    , try (withSpan parseLetExpr)
+    , try (withSpan parseExtendRestrictExpr)
+    , try (withSpan parseRecordExpr)
+    , try (withSpan parseTupleExpr)
+    , try (withSpan parseArrayExpr)
+    , try (withSpan parseImportExpr)
+    , try parseProjExpr
+    , try (withSpan parseAppExpr)
+    ]
 
 parseAtomicExpr :: Parser Expr
 parseAtomicExpr =
@@ -56,26 +57,26 @@ parseProjExpr = do
   expr <- parseAtomicExpr
   more <- some parseProjSuffix
   return $ foldl' (\e f -> f e) expr more
- where
-  parseProjSuffix :: Parser (Expr -> Expr)
-  parseProjSuffix =
-    choice
-      [ do
-          _ <- symbol "."
-          name <- identifier
-          return $ \e -> MkSpan (spanStart e) (spanEnd e) (EProj e name)
-      , do
-          args <- parens (some parseAtomicExpr)
-          return $ \e ->
-            foldl'
-              ( \f arg ->
-                  let start = spanStart f
-                      end = spanEnd arg
-                   in MkSpan start end (EApp f arg)
-              )
-              e
-              args
-      ]
+  where
+    parseProjSuffix :: Parser (Expr -> Expr)
+    parseProjSuffix =
+      choice
+        [ do
+            _ <- symbol "."
+            name <- identifier
+            return $ \e -> MkSpan (spanStart e) (spanEnd e) (EProj e name)
+        , do
+            args <- parens (some parseAtomicExpr)
+            return $ \e ->
+              foldl'
+                ( \f arg ->
+                    let start = spanStart f
+                        end = spanEnd arg
+                     in MkSpan start end (EApp f arg)
+                )
+                e
+                args
+        ]
 
 parseExtendRestrictExpr :: Parser ExprNode
 parseExtendRestrictExpr = braces $ do
@@ -84,32 +85,32 @@ parseExtendRestrictExpr = braces $ do
   baseExpr <- parseExpr
   let result = foldl applyOp baseExpr ops
   return $ spanNode result
- where
-  parseOps :: Parser [Expr -> Expr]
-  parseOps =
-    many $
-      choice
-        [ do
-            opStart <- getSourcePos
-            _ <- symbol "-"
-            name <- identifier
-            -- opEnd <- getSourcePos
-            _ <- optional $ symbol ","
-            return $ \e ->
-              MkSpan opStart (spanEnd e) (ERestrict e name)
-        , do
-            opStart <- getSourcePos
-            name <- identifier
-            _ <- symbol "="
-            val <- parseExpr
-            -- opEnd <- getSourcePos
-            _ <- optional $ symbol ","
-            return $ \e ->
-              MkSpan opStart (spanEnd e) (EExtend e name val)
-        ]
+  where
+    parseOps :: Parser [Expr -> Expr]
+    parseOps =
+      many $
+        choice
+          [ do
+              opStart <- getSourcePos
+              _ <- symbol "-"
+              name <- identifier
+              -- opEnd <- getSourcePos
+              _ <- optional $ symbol ","
+              return $ \e ->
+                MkSpan opStart (spanEnd e) (ERestrict e name)
+          , do
+              opStart <- getSourcePos
+              name <- identifier
+              _ <- symbol "="
+              val <- parseExpr
+              -- opEnd <- getSourcePos
+              _ <- optional $ symbol ","
+              return $ \e ->
+                MkSpan opStart (spanEnd e) (EExtend e name val)
+          ]
 
-  applyOp :: Expr -> (Expr -> Expr) -> Expr
-  applyOp expr op = op expr
+    applyOp :: Expr -> (Expr -> Expr) -> Expr
+    applyOp expr op = op expr
 
 parseRecordExpr :: Parser ExprNode
 parseRecordExpr = braces $ do
@@ -121,12 +122,12 @@ parseRecordExpr = braces $ do
       fields <- parseRecordField `sepBy` symbol ","
       optional (symbol ",")
       return $ ERecord fields
- where
-  parseRecordField = do
-    name <- identifier
-    symbol "="
-    expr <- parseExpr
-    return (name, expr)
+  where
+    parseRecordField = do
+      name <- identifier
+      symbol "="
+      expr <- parseExpr
+      return (name, expr)
 
 parseTupleExpr :: Parser ExprNode
 parseTupleExpr = do
@@ -183,7 +184,8 @@ parseExprNode :: Parser ExprNode
 parseExprNode = fmap spanNode parseExpr
 
 parseExpr :: Parser Expr
-parseExpr = choice
-  [ try (withSpan parseAnnotExpr)
-  , makeExprParser parseTerm operatorTable
-  ]
+parseExpr =
+  choice
+    [ try (withSpan parseAnnotExpr)
+    , makeExprParser parseTerm operatorTable
+    ]

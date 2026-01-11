@@ -4,11 +4,11 @@ module Ceca.Parser.Basic where
 
 import Ceca.AST
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
+import Text.Megaparsec.Char.Lexer qualified as L
 
 type Parser = Parsec Void Text
 
@@ -38,66 +38,70 @@ brackets = between (symbol "[") (symbol "]")
 -- Basic tokens
 identifier :: Parser Text
 identifier = lexeme $ do
-    first <- letterChar <|> char '_'
-    rest <- many (alphaNumChar <|> char '_' <|> char '\'')
-    return $ T.pack (first : rest)
+  first <- letterChar <|> char '_'
+  rest <- many (alphaNumChar <|> char '_' <|> char '\'')
+  return $ T.pack (first : rest)
 
 typeVar :: Parser Text
 typeVar = lexeme $ do
-    _ <- char '?'
-    name <- some (alphaNumChar <|> char '_' <|> char '\'')
-    return $ T.pack ('?' : name)
+  _ <- char '?'
+  name <- some (alphaNumChar <|> char '_' <|> char '\'')
+  return $ T.pack ('?' : name)
 
 escapeChar :: Parser Char
 escapeChar =
-    char '\\'
-        *> choice
-            [ '\n' <$ char 'n' -- newline
-            , '\"' <$ char '\"' -- double quote
-            , '\\' <$ char '\\' -- backslash
-            , '\t' <$ char 't' -- tab
-            , '\r' <$ char 'r' -- carriage return
-            , '\f' <$ char 'f' -- form feed
-            , '\b' <$ char 'b' -- backspace
-            ]
+  char '\\'
+    *> choice
+      [ '\n' <$ char 'n' -- newline
+      , '\"' <$ char '\"' -- double quote
+      , '\\' <$ char '\\' -- backslash
+      , '\t' <$ char 't' -- tab
+      , '\r' <$ char 'r' -- carriage return
+      , '\f' <$ char 'f' -- form feed
+      , '\b' <$ char 'b' -- backspace
+      ]
 
 -- Parse a string literal with escape sequences
 stringLiteral :: Parser Text
 stringLiteral = T.pack <$> (char '"' *> manyTill L.charLiteral (char '"'))
 
 integer :: Parser Integer
-integer = lexeme $
+integer =
+  lexeme $
     L.signed (return ()) L.decimal
 
 float :: Parser Double
-float = lexeme $ 
+float =
+  lexeme $
     L.signed (return ()) L.float
 
 bool :: Parser Bool
-bool = lexeme $
-        (string "true" >> return True)
-            <|> (string "false" >> return False)
+bool =
+  lexeme $
+    (string "true" >> return True)
+      <|> (string "false" >> return False)
 
 -- Parser for literals
 parseLiteral :: Parser Literal
-parseLiteral = lexeme $
+parseLiteral =
+  lexeme $
     choice
-        [ try $ LFloat <$> float
-        , LInt <$> integer
-        , LString <$> stringLiteral
-        , LBool <$> bool
-        ]
+      [ try $ LFloat <$> float
+      , LInt <$> integer
+      , LString <$> stringLiteral
+      , LBool <$> bool
+      ]
 
 parseImportExpr :: Parser ExprNode
 parseImportExpr = lexeme $ do
-    _ <- symbol "@"
-    path <- some (alphaNumChar <|> char '.' <|> char '/' <|> char '_' <|> char '-')
-    return $ EImport path
+  _ <- symbol "@"
+  path <- some (alphaNumChar <|> char '.' <|> char '/' <|> char '_' <|> char '-')
+  return $ EImport path
 
 -- Helper to capture source positions
 withSpan :: Parser a -> Parser (Span a)
 withSpan p = do
-    start <- getSourcePos
-    node <- p
-    end <- getSourcePos
-    return $ MkSpan start end node
+  start <- getSourcePos
+  node <- p
+  end <- getSourcePos
+  return $ MkSpan start end node
