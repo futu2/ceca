@@ -3,7 +3,6 @@
 module Ceca.AST where
 
 import Data.Data (Data)
-import Data.Generics.Uniplate.Direct
 import Data.Text (Text)
 import Text.Megaparsec.Pos (SourcePos)
 

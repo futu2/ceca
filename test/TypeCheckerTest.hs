@@ -21,8 +21,9 @@ typeCheckerTests = testGroup "TypeChecker" [
     testProperty "tuple" testTuple,
     testProperty "array" testArray,
     testProperty "record with function" testRecordWithFunction,
-    testProperty "type annotation" testAnnotation,
-    testProperty "unification error" testUnificationError
+     testProperty "type annotation" testAnnotation,
+     testProperty "complex expression" testComplexExpr,
+     testProperty "unification error" testUnificationError
   ]
 
 testLiteralInt :: Property
@@ -128,3 +129,17 @@ testUnificationError = property $ do
     case typeCheck e of
         Left _ -> success
         Right _ -> failure
+
+testComplexExpr :: Property
+testComplexExpr = property $ do
+    let pat = MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "x"))
+        body1 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
+        lambda1 = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body1)
+        record = MkSpan (initialPos "dummy") (initialPos "dummy") (ERecord [(pack "name", MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LString (pack "yahoo1")))), (pack "no", MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LInt 1)))])
+        body2 = MkSpan (initialPos "dummy") (initialPos "dummy") (ETuple [MkSpan (initialPos "dummy") (initialPos "dummy") (EProj (MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))) (pack "name")), MkSpan (initialPos "dummy") (initialPos "dummy") (EProj (MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))) (pack "no"))])
+        lambda2 = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body2)
+        innerApp = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lambda2 record)
+        e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lambda1 innerApp)
+    case typeCheck e of
+        Right _ -> success
+        Left _ -> failure

@@ -1,1 +1,1 @@
-(x=>x) $ {name = "yahoo1"} & (x => x.name)
+{name = "yahoo1", no = 1} & (x => (x.name, x.no))

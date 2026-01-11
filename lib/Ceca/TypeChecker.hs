@@ -33,20 +33,20 @@ unify' (TVar v) t = varBind v t
 unify' t (TVar v) = varBind v t
 unify' (TCon a) (TCon b)
   | a == b = return nullSubst
-  | otherwise = throwError (UnificationFail (MkSpan undefined undefined (TCon a)) (MkSpan undefined undefined (TCon b)))
+  | otherwise = throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") (TCon a)) (MkSpan (initialPos "dummy") (initialPos "dummy") (TCon b)))
 unify' (TArrow a1 a2) (TArrow b1 b2) = do
   s1 <- unify a1 b1
   s2 <- unify (apply s1 a2) (apply s1 b2)
   return (s2 `compose` s1)
 unify' (TTuple as) (TTuple bs)
   | length as == length bs = unifyList as bs
-  | otherwise = throwError (UnificationFail (MkSpan undefined undefined (TTuple as)) (MkSpan undefined undefined (TTuple bs)))
+  | otherwise = throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") (TTuple as)) (MkSpan (initialPos "dummy") (initialPos "dummy") (TTuple bs)))
 unify' (TArray a) (TArray b) = unify a b
 unify' TRecordEmpty TRecordEmpty = return nullSubst
 unify' r1@(TRecordExtend _ _ _) r2@(TRecordExtend _ _ _) = unifyRecords r1 r2
 unify' r1@(TRecordExtend _ _ _) TRecordEmpty = unifyRecords r1 TRecordEmpty
 unify' TRecordEmpty r2@(TRecordExtend _ _ _) = unifyRecords TRecordEmpty r2
-unify' t1 t2 = throwError (UnificationFail (MkSpan undefined undefined t1) (MkSpan undefined undefined t2))
+unify' t1 t2 = throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") t1) (MkSpan (initialPos "dummy") (initialPos "dummy") t2))
 
 unifyList :: [Type] -> [Type] -> TI Subst
 unifyList [] [] = return nullSubst
@@ -56,14 +56,34 @@ unifyRecords :: TypeNode -> TypeNode -> TI Subst
 unifyRecords r1 r2 = do
   let (m1, rest1) = decomposeRecord r1
       (m2, rest2) = decomposeRecord r2
-  if Map.keys m1 /= Map.keys m2 then throwError (UnificationFail (MkSpan undefined undefined r1) (MkSpan undefined undefined r2)) else return ()
-  s1 <- unifyMaps (Map.toList m1) (Map.toList m2)
-  s2 <- case (rest1, rest2) of
-    (Nothing, Nothing) -> return nullSubst
-    (Just v, Nothing) -> varBind v TRecordEmpty
-    (Nothing, Just v) -> varBind v TRecordEmpty
-    (Just v1, Just v2) -> unify' (TVar v1) (TVar v2)
-  return (s2 `compose` s1)
+  let keys1 = Set.fromList (Map.keys m1)
+      keys2 = Set.fromList (Map.keys m2)
+  if keys1 == keys2 then do
+    s1 <- unifyMaps (Map.toList m1) (Map.toList m2)
+    s2 <- case (rest1, rest2) of
+      (Nothing, Nothing) -> return nullSubst
+      (Just v, Nothing) -> varBind v TRecordEmpty
+      (Nothing, Just v) -> varBind v TRecordEmpty
+      (Just v1, Just v2) -> unify' (TVar v1) (TVar v2)
+    return (s2 `compose` s1)
+  else if rest1 /= Nothing && rest2 == Nothing && keys1 `Set.isSubsetOf` keys2 then do
+    let common = keys1
+    s1 <- unifyMaps (Map.toList m1) (Map.toList (Map.restrictKeys m2 common))
+    let extra = Map.withoutKeys m2 common
+    let extraRecord = foldl (\acc (l, t) -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l (apply s1 t) acc)) (MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty) (Map.toList extra)
+    let Just v = rest1
+    s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v)) extraRecord
+    return (s2 `compose` s1)
+  else if rest2 /= Nothing && rest1 == Nothing && keys2 `Set.isSubsetOf` keys1 then do
+    let common = keys2
+    s1 <- unifyMaps (Map.toList (Map.restrictKeys m1 common)) (Map.toList m2)
+    let extra = Map.withoutKeys m1 common
+    let extraRecord = foldl (\acc (l, t) -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l (apply s1 t) acc)) (MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty) (Map.toList extra)
+    let Just v = rest2
+    s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v)) extraRecord
+    return (s2 `compose` s1)
+  else
+    throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") r1) (MkSpan (initialPos "dummy") (initialPos "dummy") r2))
 
 unifyMaps :: [(Text, Type)] -> [(Text, Type)] -> TI Subst
 unifyMaps [] [] = return nullSubst
@@ -75,8 +95,8 @@ unifyMaps ((_, t1) : ts1) ((_, t2) : ts2) = do
 varBind :: Text -> TypeNode -> TI Subst
 varBind v t
   | TVar v == t = return nullSubst
-  | v `Set.member` ftv t = throwError (InfiniteType v (MkSpan undefined undefined t))
-  | otherwise = return (Map.singleton v (MkSpan undefined undefined t))
+  | v `Set.member` ftv t = throwError (InfiniteType v (MkSpan (initialPos "dummy") (initialPos "dummy") t))
+  | otherwise = return (Map.singleton v (MkSpan (initialPos "dummy") (initialPos "dummy") t))
 
 instantiate :: Scheme -> TI Type
 instantiate (Forall as t) = do
