@@ -1,1 +1,3 @@
-{name = "yahoo1", no = 1} & (x => (x.name, x.no))
+let y = {name = "yahoo1", no = 1} ;
+
+(x => (x.name, x.no)) y

@@ -17,6 +17,7 @@ validateCore e = case spanNode e of
   EAbs pat _ -> case spanNode pat of
     PVar _ -> validateCoreBody e
     _ -> False
+  ELet _ _ _ _ -> False
   _ -> all validateCore (subExprs e)
   where
     subExprs (MkSpan _ _ node) = case node of
@@ -52,15 +53,17 @@ desugarExpr (MkSpan s e node) = case node of
     (pat', lets) <- desugarPat pat
     body' <- desugarExpr body
     let body'' = foldr (\(x, proj) b -> MkSpan s e (ELet x Nothing proj b)) body' lets
-    return $ MkSpan s e (EAbs pat' body'')
+    body''' <- desugarExpr body''
+    return $ MkSpan s e (EAbs pat' body''')
   EApp e1 e2 -> do
     e1' <- desugarExpr e1
     e2' <- desugarExpr e2
     return $ MkSpan s e (EApp e1' e2')
-  ELet x mty e1 e2 -> do
+  ELet x _ e1 e2 -> do
     e1' <- desugarExpr e1
     e2' <- desugarExpr e2
-    return $ MkSpan s e (ELet x mty e1' e2')
+    let abs_expr = MkSpan s e (EAbs (MkSpan s e (PVar x)) e2')
+    return $ MkSpan s e (EApp abs_expr e1')
   ERecord fields -> do
     fields' <- mapM (\(l, ex) -> do ex' <- desugarExpr ex; return (l, ex')) fields
     return $ MkSpan s e (ERecord fields')

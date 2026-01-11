@@ -12,7 +12,8 @@ desugarTests :: TestTree
 desugarTests = testGroup "Desugar" [
     testProperty "identity lambda" testIdentityLambda,
     testProperty "tuple pattern" testTuplePattern,
-    testProperty "record pattern" testRecordPattern
+    testProperty "record pattern" testRecordPattern,
+    testProperty "let desugaring" testLetDesugaring
   ]
 
 testIdentityLambda :: Property
@@ -44,6 +45,16 @@ testRecordPattern = property $ do
         pat = MkSpan (initialPos "dummy") (initialPos "dummy") (PRecord [(pack "a", pat1), (pack "b", pat2)] Nothing)
         body = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body)
+        desugared = desugar e
+    case coreExpr (unCore desugared) of
+        Just _ -> success
+        Nothing -> failure
+
+testLetDesugaring :: Property
+testLetDesugaring = property $ do
+    let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "y"))
+        e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
+        e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet (pack "x") Nothing e1 e2)
         desugared = desugar e
     case coreExpr (unCore desugared) of
         Just _ -> success
