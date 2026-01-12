@@ -45,12 +45,12 @@
         enable = true;
         dependencies = [
           "containers"
-          "hedgehog >= 1.1 && < 1.5"
+          "hedgehog >= 1.1"
           "megaparsec"
           "mtl"
           "parser-combinators"
-          "tasty ^>= 1.4"
-          "tasty-hedgehog >= 1.3 && < 1.5"
+          "tasty >= 1.4"
+          "tasty-hedgehog >= 1.3"
           "text"
         ];
       };

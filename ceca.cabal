@@ -88,6 +88,6 @@ test-suite ceca-test
     , mtl
     , parser-combinators
     , tasty >=1.4
-    , tasty-hedgehog >=1.3 
+    , tasty-hedgehog >=1.3
     , text
   default-language: GHC2021
