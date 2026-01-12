@@ -16,7 +16,7 @@ import Text.Megaparsec hiding (failure)
 patternExprTestMain :: IO ()
 patternExprTestMain = do
   putStrLn "Running Ceca Pattern and Expression Parser Tests..."
-  success <-
+  isSuccess <-
     checkParallel $
       Group
         "Ceca.PatternExprParser"
@@ -36,7 +36,7 @@ patternExprTestMain = do
         , ("prop_parseBuiltins", prop_parseBuiltins)
         , ("prop_exprRoundtrip", prop_exprRoundtrip)
         ]
-  if success
+  if isSuccess
     then putStrLn "All tests passed!"
     else putStrLn "Some tests failed."
 
@@ -57,6 +57,7 @@ runUnitTestsExpr = do
   test_parseLetExpr
   test_parseExtendRestrict
   test_parseRecordPattern
+  test_parseInfix
   test_parseBuiltinExpr
   test_parseInvalidExprFails
   putStrLn "All unit tests passed!"
@@ -139,12 +140,12 @@ genRecordPattern = do
   if null fields && not hasRest
     then pure "{}"
     else do
-      let fieldStrs = map (\f -> f <> " : " <> f) fields -- Bind to same name
+      let fieldStrs = map (\f -> f <> " = " <> f) fields -- Bind to same name
       if hasRest
         then do
           restVar <- genIdentifier
           let fieldsPart = if null fieldStrs then "" else T.intercalate ", " fieldStrs <> ", "
-          return $ "{" <> fieldsPart <> "... " <> restVar <> "}"
+          return $ "{" <> fieldsPart <> "| " <> restVar <> "}"
         else
           return $ "{" <> T.intercalate ", " fieldStrs <> "}"
 
@@ -601,9 +602,9 @@ prettyPrintPatternNode (PVar name) = name
 prettyPrintPatternNode PWildcard = "_"
 prettyPrintPatternNode (PLit lit) = prettyPrintLiteral lit
 prettyPrintPatternNode (PRecord fields mrest) =
-  let fieldStrs = map (\(n, p) -> n <> " : " <> prettyPrintPattern p) fields
+  let fieldStrs = map (\(n, p) -> n <> " = " <> prettyPrintPattern p) fields
       restStr = case mrest of
-        Just rest -> "... " <> prettyPrintPattern rest
+        Just rest -> "| " <> prettyPrintPattern rest
         Nothing -> ""
       allStrs = fieldStrs ++ [restStr | not (T.null restStr)]
    in "{" <> T.intercalate ", " allStrs <> "}"
@@ -851,7 +852,7 @@ test_parseExtendRestrict = do
 
 test_parseRecordPattern :: IO ()
 test_parseRecordPattern = do
-  let result = parse parsePatternOnly "test" "{x, y : z, ...rest}"
+  let result = parse parsePatternOnly "test" "{x, y = z, | rest}"
   case result of
     Right (MkSpan _ _ (PRecord fields mrest)) -> do
       if length fields /= 2
@@ -894,6 +895,32 @@ test_parseInvalidExprFails = do
           Left _ -> return ()
     )
     invalidExprs
+
+test_parseInfix :: IO ()
+test_parseInfix = do
+  -- Test basic infix without spaces
+  let result1 = parse parseProgram "test" "1+2"
+  case result1 of
+    Right _ -> return ()
+    Left err -> error $ "test_parseInfix failed for 1+2: " ++ errorBundlePretty err
+
+  -- Test basic infix with spaces
+  let result2 = parse parseProgram "test" "1 + 2"
+  case result2 of
+    Right _ -> return ()
+    Left err -> error $ "test_parseInfix failed for 1 + 2: " ++ errorBundlePretty err
+
+  -- Test custom infix
+  let result3 = parse parseProgram "test" "__add__ 1 2"
+  case result3 of
+    Right _ -> return ()
+    Left err -> error $ "test_parseInfix failed for __add__ 1 2: " ++ errorBundlePretty err
+
+  -- Test & with spaces
+  let result4 = parse parseProgram "test" "1 & 2"
+  case result4 of
+    Right _ -> return ()
+    Left err -> error $ "test_parseInfix failed for 1 & 2: " ++ errorBundlePretty err
 
 test_parseBuiltinExpr :: IO ()
 test_parseBuiltinExpr = do

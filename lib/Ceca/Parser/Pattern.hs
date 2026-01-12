@@ -53,15 +53,20 @@ parseRecordPattern =
         -- Parse fields
         fields <- manyTill parseRecordFieldPattern (lookAhead restOrEnd)
         -- Parse optional rest
-        mrest <- optional (symbol "..." >> parsePattern)
+        mrest <- optional $ do
+          void $ symbol "|"
+          pos <- getSourcePos
+          let defaultPat = MkSpan pos pos PWildcard
+          pat <- option defaultPat parsePattern
+          return pat
         return $ PRecord fields mrest -- NO symbol "}" here!
   where
     restOrEnd :: Parser ()
-    restOrEnd = void (symbol "...") <|> void (symbol "}") -- For lookAhead only
+    restOrEnd = void (symbol "|") <|> void (symbol "}") -- For lookAhead only
     parseRecordFieldPattern :: Parser (Text, Pattern)
     parseRecordFieldPattern = do
       name <- identifier
-      mpat <- optional (symbol ":" >> parsePattern)
+      mpat <- optional (symbol "=" >> parsePattern)
       optional (symbol ",") -- Consume optional comma after field
       case mpat of
         Just pat -> return (name, pat)
