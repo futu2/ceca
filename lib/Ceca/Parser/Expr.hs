@@ -207,14 +207,14 @@ parseLambdaExpr = do
 
 parseLetExpr :: Parser ExprNode
 parseLetExpr = do
-  _ <- symbol "let"
-  name <- identifier
+  symbol "let"
+  pat <- parsePattern
   typ <- optional (symbol ":" >> parseType)
-  _ <- symbol "="
+  symbol "="
   val <- parseExpr
-  _ <- symbol ";"
+  symbol ";"
   body <- parseExpr
-  return $ ELet name typ val body
+  return $ ELet pat typ val body
 
 parseAnnotExpr :: Parser ExprNode
 parseAnnotExpr = do

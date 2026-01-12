@@ -78,7 +78,7 @@ testLetBinding :: Property
 testLetBinding = property $ do
     let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LInt 42))
         e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
-        e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet (pack "x") Nothing e1 e2)
+        e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet (MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "x"))) Nothing e1 e2)
     case typeCheck e of
         Right _ -> success
         Left _ -> failure

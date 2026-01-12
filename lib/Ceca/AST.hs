@@ -42,7 +42,7 @@ data ExprNode
   -- and in syntax sugar, extend and restrict could be used mixed
   -- e.g. {-l, l = e' | e} means remove old l key-value and attach new l wiht value e'
   -- same for {-l1, l1 = e', -l2, l3 = e'' | e }
-  | ELet Text (Maybe Type) Expr Expr -- Let binding: x : t? = e1 ; e2
+  |     ELet Pattern (Maybe Type) Expr Expr -- Let binding: x : t? = e1 ; e2
   -- semi-colum could be ommited in the end of line and following a newline, that means the following code is equal
   -- x : t?
   --   = e1

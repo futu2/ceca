@@ -54,7 +54,7 @@ testLetDesugaring :: Property
 testLetDesugaring = property $ do
     let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "y"))
         e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
-        e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet (pack "x") Nothing e1 e2)
+        e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet (MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "x"))) Nothing e1 e2)
         desugared = desugar e
     case coreExpr (unCore desugared) of
         Just _ -> success

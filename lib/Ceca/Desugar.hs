@@ -52,17 +52,20 @@ desugarExpr (MkSpan s e node) = case node of
   EAbs pat body -> do
     (pat', lets) <- desugarPat pat
     body' <- desugarExpr body
-    let body'' = foldr (\(x, proj) b -> MkSpan s e (ELet x Nothing proj b)) body' lets
+    let body'' = foldr (\(x, proj) b -> MkSpan s e (ELet (MkSpan s e (PVar x)) Nothing proj b)) body' lets
     body''' <- desugarExpr body''
     return $ MkSpan s e (EAbs pat' body''')
   EApp e1 e2 -> do
     e1' <- desugarExpr e1
     e2' <- desugarExpr e2
     return $ MkSpan s e (EApp e1' e2')
-  ELet x _ e1 e2 -> do
+  ELet pat mty e1 e2 -> do
     e1' <- desugarExpr e1
     e2' <- desugarExpr e2
-    let abs_expr = MkSpan s e (EAbs (MkSpan s e (PVar x)) e2')
+    (pat', lets) <- desugarPat pat
+    let body_with_lets = foldr (\(x, proj) b -> MkSpan s e (ELet (MkSpan s e (PVar x)) Nothing proj b)) e2' lets
+    body_with_lets' <- desugarExpr body_with_lets
+    let abs_expr = MkSpan s e (EAbs pat' body_with_lets')
     return $ MkSpan s e (EApp abs_expr e1')
   ERecord fields -> do
     fields' <- mapM (\(l, ex) -> do ex' <- desugarExpr ex; return (l, ex')) fields

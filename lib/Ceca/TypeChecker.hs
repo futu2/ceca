@@ -138,23 +138,22 @@ inferExpr e = case spanNode e of
     tv <- fresh
     s3 <- unify (apply s2 t1) (MkSpan (initialPos "dummy") (initialPos "dummy") (TArrow t2 tv))
     return (s3 `compose` s2 `compose` s1, apply s3 tv)
-  ELet x mty e1 e2 -> do
+  ELet pat mty e1 e2 -> do
     (s1, t1) <- inferExpr e1
+    (s2, t_pat, env_pat) <- inferPat pat
+    s3 <- unify (apply s2 t1) t_pat
+    let t1' = apply s3 t1
     env <- ask
+    let env_pat' = Map.map (\(Forall [] t) -> generalize (apply s3 env) (apply s3 t)) env_pat
     case mty of
       Just ty -> do
-        s2 <- unify (apply s1 t1) ty
-        let t1' = apply s2 t1
-            sc = generalize (apply s2 env) t1'
-            env' = Map.singleton x sc
-        (s3, t2) <- local (Map.insert x sc . apply (s2 `compose` s1)) (inferExpr e2)
-        return (s3 `compose` s2 `compose` s1, t2)
+        s4 <- unify t1' ty
+        let env_pat'' = Map.map (apply s4) env_pat'
+        (s5, t2) <- local (Map.union env_pat'' . apply (s4 `compose` s3 `compose` s2 `compose` s1)) (inferExpr e2)
+        return (s5 `compose` s4 `compose` s3 `compose` s2 `compose` s1, t2)
       Nothing -> do
-        let t1' = apply s1 t1
-            sc = generalize env t1'
-            env' = Map.singleton x sc
-        (s2, t2) <- local (Map.insert x sc . apply s1) (inferExpr e2)
-        return (s2 `compose` s1, t2)
+        (s4, t2) <- local (Map.union env_pat' . apply (s3 `compose` s2 `compose` s1)) (inferExpr e2)
+        return (s4 `compose` s3 `compose` s2 `compose` s1, t2)
   ERecord fields -> do
     (ss, ts) <- unzip <$> mapM inferExpr (map snd fields)
     let s = foldr compose nullSubst ss

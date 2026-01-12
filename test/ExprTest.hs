@@ -55,6 +55,7 @@ runUnitTestsExpr = do
   test_parseApplicationLambdaToRecord
   test_parseProjection
   test_parseLetExpr
+  test_parseLetPattern
   test_parseExtendRestrict
   test_parseRecordPattern
   test_parseInfix
@@ -585,11 +586,11 @@ prettyPrintExprNode (EExtend e field value) =
   "{" <> field <> " = " <> prettyPrintExpr value <> " | " <> prettyPrintExpr e <> "}"
 prettyPrintExprNode (ERestrict e field) =
   "{-" <> field <> " | " <> prettyPrintExpr e <> "}"
-prettyPrintExprNode (ELet name mtype expr body) =
+prettyPrintExprNode (ELet pat mtype expr body) =
   let typePart = case mtype of
         Just t -> " : " <> prettyPrintType t
         Nothing -> ""
-   in "let " <> name <> typePart <> " = " <> prettyPrintExpr expr <> "; " <> prettyPrintExpr body
+   in "let " <> prettyPrintPattern pat <> typePart <> " = " <> prettyPrintExpr expr <> "; " <> prettyPrintExpr body
 prettyPrintExprNode (EAnnot e t) = prettyPrintExpr e <> " : " <> prettyPrintType t
 prettyPrintExprNode (EBuiltin name) = "%%" <> name <> "%%"
 prettyPrintExprNode (EImport path) = "@" <> T.pack path
@@ -794,9 +795,9 @@ test_parseLetExpr :: IO ()
 test_parseLetExpr = do
   let result = parse parseProgram "test" "let x = 42; x"
   case result of
-    Right (MkSpan _ _ (ELet name Nothing val body)) -> do
-      if name /= "x"
-        then error $ "test_parseLetExpr failed: Name should be x, got " ++ show name
+    Right (MkSpan _ _ (ELet pat Nothing val body)) -> do
+      if spanNode pat /= PVar "x"
+        then error $ "test_parseLetExpr failed: Pattern should be x, got " ++ show pat
         else do
           case spanNode val of
             ELit (LInt 42) -> return ()
@@ -806,6 +807,22 @@ test_parseLetExpr = do
             _ -> error "test_parseLetExpr failed: Body should be x"
     Right other -> error $ "test_parseLetExpr failed: Expected ELet, got: " ++ show other
     Left err -> error $ "test_parseLetExpr failed: " ++ errorBundlePretty err
+
+test_parseLetPattern :: IO ()
+test_parseLetPattern = do
+  let result = parse parseProgram "test" "let (a, b) = (1, 2); a + b"
+  case result of
+    Right (MkSpan _ _ (ELet pat Nothing val body)) -> do
+      case spanNode pat of
+        PTuple [MkSpan _ _ (PVar "a"), MkSpan _ _ (PVar "b")] -> return ()
+        _ -> error $ "test_parseLetPattern failed: Pattern should be (a, b), got " ++ show pat
+      case spanNode val of
+        ETuple [MkSpan _ _ (ELit (LInt 1)), MkSpan _ _ (ELit (LInt 2))] -> return ()
+        _ -> error $ "test_parseLetPattern failed: Value should be (1, 2), got " ++ show val
+      -- Body is a + b, which is EApp (EApp + a) b, but simplified
+      return ()
+    Right other -> error $ "test_parseLetPattern failed: Expected ELet, got: " ++ show other
+    Left err -> error $ "test_parseLetPattern failed: " ++ errorBundlePretty err
 
 test_parseExtendRestrict :: IO ()
 test_parseExtendRestrict = do
