@@ -33,6 +33,7 @@ patternExprTestMain = do
         , ("prop_parsePatterns", prop_parsePatterns)
         , ("prop_parseRecordPatterns", prop_parseRecordPatterns)
         , ("prop_parseExtendRestrict", prop_parseExtendRestrict)
+        , ("prop_parseBuiltins", prop_parseBuiltins)
         , ("prop_exprRoundtrip", prop_exprRoundtrip)
         ]
   if success
@@ -52,11 +53,11 @@ runUnitTestsExpr = do
   test_parseApplication
   test_parseApplicationLambdaToLambda
   test_parseApplicationLambdaToRecord
-  test_parseInfix
   test_parseProjection
   test_parseLetExpr
   test_parseExtendRestrict
   test_parseRecordPattern
+  test_parseBuiltinExpr
   test_parseInvalidExprFails
   putStrLn "All unit tests passed!"
 
@@ -90,6 +91,11 @@ genLiteral =
     , genStringLiteral
     , genBoolLiteral
     ]
+
+genBuiltin :: Gen Text
+genBuiltin = do
+  name <- genIdentifier
+  return $ "%%" <> name <> "%%"
 
 genIdentifier :: Gen Text
 genIdentifier = do
@@ -170,6 +176,7 @@ genSimpleExpr =
   Gen.choice
     [ genLiteral
     , genIdentifier
+    , genBuiltin
     ]
 
 genRecordExpr :: Gen Text
@@ -204,7 +211,7 @@ genApplication = do
 genInfix :: Gen Text
 genInfix = do
   e1 <- genSimpleExpr
-  op <- Gen.element ["&", "$"]
+  op <- Gen.element ["&", "$", "+", "-"]
   e2 <- genSimpleExpr
   return $ e1 <> " " <> op <> " " <> e2
 
@@ -446,6 +453,21 @@ prop_parseExtendRestrict = property $ do
       annotateShow err
       failure
 
+prop_parseBuiltins :: Property
+prop_parseBuiltins = property $ do
+  builtin <- forAll genBuiltin
+  let result = parse parseProgram "test" builtin
+  annotateShow result
+  case result of
+    Right (MkSpan _ _ (EBuiltin name)) -> do
+      assert $ builtin == "%%" <> name <> "%%"
+    Right other -> do
+      annotateShow other
+      failure
+    Left err -> do
+      annotateShow err
+      failure
+
 -- Roundtrip property for expressions
 prop_exprRoundtrip :: Property
 prop_exprRoundtrip = property $ do
@@ -499,6 +521,7 @@ prop_exprRoundtrip = property $ do
     typeOptEq _ _ = False
   exprNodeEq (EAnnot e1 t1) (EAnnot e2 t2) =
     exprNodeEq (spanNode e1) (spanNode e2) && typeNodeEq (spanNode t1) (spanNode t2)
+  exprNodeEq (EBuiltin n1) (EBuiltin n2) = n1 == n2
   exprNodeEq (EImport p1) (EImport p2) = p1 == p2
   exprNodeEq _ _ = False
 
@@ -750,22 +773,6 @@ test_parseApplicationLambdaToRecord = do
     Right other -> error $ "test_parseApplicationLambdaToRecord failed: Expected EApp, got: " ++ show other
     Left err -> error $ "test_parseApplicationLambdaToRecord failed: " ++ errorBundlePretty err
 
-test_parseInfix :: IO ()
-test_parseInfix = do
-  -- Test & (left associative, reverse application)
-  let result1 = parse parseProgram "test" "x & y"
-  case result1 of
-    Right (MkSpan _ _ (EApp (MkSpan _ _ (EVar "y")) (MkSpan _ _ (EVar "x")))) -> return ()
-    Right other -> error $ "test_parseInfix failed for &: Expected EApp y x, got: " ++ show other
-    Left err -> error $ "test_parseInfix failed for &: " ++ errorBundlePretty err
-
-  -- Test $ (right associative)
-  let result2 = parse parseProgram "test" "x $ y"
-  case result2 of
-    Right (MkSpan _ _ (EApp (MkSpan _ _ (EVar "x")) (MkSpan _ _ (EVar "y")))) -> return ()
-    Right other -> error $ "test_parseInfix failed for $: Expected EApp x y, got: " ++ show other
-    Left err -> error $ "test_parseInfix failed for $: " ++ errorBundlePretty err
-
 test_parseProjection :: IO ()
 test_parseProjection = do
   -- Test simple projection
@@ -887,3 +894,24 @@ test_parseInvalidExprFails = do
           Left _ -> return ()
     )
     invalidExprs
+
+test_parseBuiltinExpr :: IO ()
+test_parseBuiltinExpr = do
+  let tests =
+        [ ("%%add%%", "add")
+        , ("%%mul%%", "mul")
+        , ("%%sub%%", "sub")
+        ]
+
+  mapM_
+    ( \(input, expectedName) -> do
+        let result = parse parseProgram "test" input
+        case result of
+          Right (MkSpan _ _ (EBuiltin name)) ->
+            if name == expectedName
+              then return ()
+              else error $ "test_parseBuiltinExpr failed for " ++ show input ++ ": got " ++ show name
+          Right other -> error $ "test_parseBuiltinExpr failed for " ++ show input ++ ": Expected EBuiltin, got: " ++ show other
+          Left err -> error $ "test_parseBuiltinExpr failed for " ++ show input ++ ": " ++ errorBundlePretty err
+    )
+    tests

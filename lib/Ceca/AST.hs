@@ -28,9 +28,10 @@ data TypeNode
 
 type Expr = Span ExprNode
 data ExprNode
-  = EVar Text -- Variable: x
-  | ELit Literal -- Literal: 42, 1.0, "hello", true
-  | EAbs Pattern Expr -- Lambda: pattern => expr
+   = EVar Text -- Variable: x
+   | ELit Literal -- Literal: 42, 1.0, "hello", true
+   | EBuiltin Text -- Builtin variable: %%builtin%%
+   | EAbs Pattern Expr -- Lambda: pattern => expr
   | EApp Expr Expr -- Application: e1 e2
   | ERecord [(Text, Expr)] -- Record: {l1 = e1, ..., ln = en}
   | ETuple [Expr] -- Tuple: (e1, e2, ..., en)

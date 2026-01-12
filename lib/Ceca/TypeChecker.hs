@@ -118,6 +118,9 @@ litType (LBool _) = MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pack
 inferExpr :: Expr -> TI (Subst, Type)
 inferExpr e = case spanNode e of
   ELit l -> return (nullSubst, litType l)
+  EBuiltin _ -> do
+    tv <- fresh
+    return (nullSubst, tv)
   EVar x -> do
     env <- ask
     case Map.lookup x env of

@@ -103,7 +103,8 @@ parseAtomicExpr :: Parser Expr
 parseAtomicExpr =
   withSpan $
     choice
-      [ ELit <$> parseLiteral
+      [ try (EBuiltin <$> (symbol "%%" >> identifier <* symbol "%%"))
+      , ELit <$> parseLiteral
       , EVar <$> identifier
       , try parseRecordExpr
       , parens parseExprNode
