@@ -20,6 +20,7 @@ library
       Ceca
       Ceca.AST
       Ceca.Desugar
+      Ceca.Importer
       Ceca.Normalizer
       Ceca.Parser
       Ceca.Parser.Basic
@@ -38,6 +39,7 @@ library
   build-depends:
       base ==4.*
     , containers
+    , filepath
     , megaparsec
     , mtl
     , parser-combinators
@@ -58,6 +60,7 @@ executable ceca
       base ==4.*
     , ceca
     , containers
+    , filepath
     , megaparsec
     , mtl
     , parser-combinators

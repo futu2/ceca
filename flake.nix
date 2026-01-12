@@ -22,6 +22,7 @@
         enable = true;
         dependencies = [
           "containers"
+          "filepath"
           "megaparsec"
           "mtl"
           "parser-combinators"
@@ -35,6 +36,7 @@
         dependencies = [
           "containers"
           "megaparsec"
+          "filepath"
           "mtl"
           "parser-combinators"
           "text"
