@@ -27,6 +27,7 @@ library
       Ceca.Parser.Expr
       Ceca.Parser.Pattern
       Ceca.Parser.Type
+      Ceca.Pretty
       Ceca.TypeChecker
       Ceca.Types
   other-modules:
@@ -43,6 +44,7 @@ library
     , megaparsec
     , mtl
     , parser-combinators
+    , prettyprinter
     , text
     , uniplate
   default-language: GHC2021
@@ -74,6 +76,7 @@ test-suite ceca-test
       DesugarTest
       ExprTest
       NormalizerTest
+      PrettyTest
       TypeCheckerTest
       TypeTest
       Paths_ceca
@@ -90,6 +93,7 @@ test-suite ceca-test
     , megaparsec
     , mtl
     , parser-combinators
+    , prettyprinter
     , tasty >=1.4
     , tasty-hedgehog >=1.3
     , text

@@ -28,6 +28,7 @@
           "parser-combinators"
           "text"
           "uniplate"
+          "prettyprinter"
         ];
       };
 
@@ -54,6 +55,7 @@
           "tasty >= 1.4"
           "tasty-hedgehog >= 1.3"
           "text"
+          "prettyprinter"
         ];
       };
 
