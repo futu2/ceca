@@ -12,19 +12,76 @@ import Ceca.Parser.Pattern (parsePattern)
 import Ceca.Parser.Type
 import Control.Monad (guard, void)
 
--- Helper for reverse application (like Haskell's &)
-reverseBinary :: Expr -> Expr -> Expr
-reverseBinary e1 e2 = MkSpan (spanStart e1) (spanEnd e2) (EApp e2 e1)
-
 -- Helper for binary application
-binary :: Expr -> Expr -> Expr
-binary e1 e2 = MkSpan (spanStart e1) (spanEnd e2) (EApp e1 e2)
+binary :: Text -> Expr -> Expr -> Expr
+binary opName e1 e2 = MkSpan (spanStart e1) (spanEnd e2) $ EApp firstPart e2
+  where
+    firstPart =
+      MkSpan (spanStart e1) (spanStart e2) $
+        EApp
+          (MkSpan (spanEnd e1) (spanStart e2) $ EVar $ "__" <> opName <> "__")
+          e1
 
 -- Operator table for infix operators
 operatorTable :: [[Operator Parser Expr]]
 operatorTable =
-  [ [InfixL (reverseBinary <$ symbol "&")]
-  , [InfixR (binary <$ symbol "$")]
+  [ -- Level 9: Function application
+
+    [ InfixR (binary <$> symbol "$")
+    ]
+  , -- Level 8: Exponentiation (right associative)
+
+    [ InfixR (binary <$> symbol "^")
+    , InfixR (binary <$> symbol "^^")
+    , InfixR (binary <$> symbol "**")
+    ]
+  , -- Level 7: Multiplication/Division
+
+    [ InfixL (binary <$> symbol "*")
+    , InfixL (binary <$> symbol "/")
+    , InfixL (binary <$> symbol "%")
+    -- ,InfixL (binary <$ symbol "`div`")
+    -- ,InfixL (binary <$ symbol "`mod`")
+    -- ,InfixL (binary <$ symbol "`rem`")
+    -- ,InfixL (binary <$ symbol "`quot`")
+    ]
+  , -- Level 6: Addition/Subtraction
+
+    [ InfixL (binary <$> symbol "+")
+    , InfixL (binary <$> symbol "-")
+    ]
+  , -- Level 5: Append
+    [InfixR (binary <$> symbol "++")]
+  , -- Level 4: Comparison (non-associative)
+
+    [ InfixN (binary <$> symbol "==")
+    , InfixN (binary <$> symbol "/=")
+    , InfixN (binary <$> symbol "<")
+    , InfixN (binary <$> symbol "<=")
+    , InfixN (binary <$> symbol ">")
+    , InfixN (binary <$> symbol ">=")
+    -- ,InfixN (binary <$ symbol "`elem`")
+    -- ,InfixN (binary <$ symbol "`notElem`")
+    ]
+  , -- Level 3: Logical AND (right associative)
+    [InfixR (binary <$> symbol "&&")]
+  , -- Level 2: Logical OR (right associative)
+    [InfixR (binary <$> symbol "||")]
+  , -- Level 1: Sequencing
+
+    [ InfixR (binary <$> symbol ">>")
+    , InfixR (binary <$> symbol ">>=")
+    ]
+  , -- Level 0: Reverse application, cons, assignment
+
+    [ InfixL (binary <$> symbol "&")
+    -- ,InfixR (binary <$> symbol ":")
+    -- ,InfixR (binary <$> symbol "=")
+    ]
+  , -- Level -1: Custom operator
+
+    [ InfixN $ binary <$> try infixOperator
+    ]
   ]
 
 -- Parser for expressions without infix

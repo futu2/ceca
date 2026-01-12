@@ -9,6 +9,7 @@ import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
+import Control.Monad (guard)
 
 type Parser = Parsec Void Text
 
@@ -37,10 +38,35 @@ brackets = between (symbol "[") (symbol "]")
 
 -- Basic tokens
 identifier :: Parser Text
-identifier = lexeme $ do
+identifier =
+  choice
+    [ try operatorIdentifier
+    , try normalIdentifier
+    ]
+
+normalIdentifier :: Parser Text
+normalIdentifier = lexeme $ do
   first <- letterChar <|> char '_'
   rest <- many (alphaNumChar <|> char '_' <|> char '\'')
   return $ T.pack (first : rest)
+
+operatorIdentifier :: Parser Text
+operatorIdentifier = lexeme $ do
+  _ <- char '_' >> char '_'
+  op <- operatorName
+  _ <- char '_' >> char '_'
+  return $ "__" <> op <> "__"
+
+infixOperator :: Parser Text
+infixOperator = lexeme $ do
+  operatorName
+
+operatorName :: Parser Text
+operatorName = do
+  opName <- some $ oneOf ("!#$%&*+./<=>?@\\^|-~" :: String)
+  guard $ opName /= "="
+  guard $ opName /= "|"
+  return $ T.pack opName
 
 typeVar :: Parser Text
 typeVar = lexeme $ do
