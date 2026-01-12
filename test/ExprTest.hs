@@ -567,6 +567,7 @@ prettyPrintExprNode (ELet name mtype expr body) =
         Nothing -> ""
    in "let " <> name <> typePart <> " = " <> prettyPrintExpr expr <> "; " <> prettyPrintExpr body
 prettyPrintExprNode (EAnnot e t) = prettyPrintExpr e <> " : " <> prettyPrintType t
+prettyPrintExprNode (EBuiltin name) = "%%" <> name <> "%%"
 prettyPrintExprNode (EImport path) = "@" <> T.pack path
 
 prettyPrintPattern :: Pattern -> Text
