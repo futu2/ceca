@@ -143,16 +143,17 @@ inferExpr e = case spanNode e of
     (s2, t_pat, env_pat) <- inferPat pat
     s3 <- unify (apply s2 t1) t_pat
     let t1' = apply s3 t1
-    env <- ask
-    let env_pat' = Map.map (\(Forall [] t) -> generalize (apply s3 env) (apply s3 t)) env_pat
+    let env_pat_mono = Map.map (apply s3) env_pat
     case mty of
       Just ty -> do
         s4 <- unify t1' ty
-        let env_pat'' = Map.map (apply s4) env_pat'
-        (s5, t2) <- local (Map.union env_pat'' . apply (s4 `compose` s3 `compose` s2 `compose` s1)) (inferExpr e2)
+        let env_pat_final = Map.map (apply s4) env_pat_mono
+        (s5, t2) <- local (Map.union env_pat_final . apply (s4 `compose` s3 `compose` s2 `compose` s1)) (inferExpr e2)
         return (s5 `compose` s4 `compose` s3 `compose` s2 `compose` s1, t2)
       Nothing -> do
-        (s4, t2) <- local (Map.union env_pat' . apply (s3 `compose` s2 `compose` s1)) (inferExpr e2)
+        env <- ask
+        let env_pat_final = Map.map (\(Forall [] t) -> generalize (apply s3 env) t) env_pat_mono
+        (s4, t2) <- local (Map.union env_pat_final . apply (s3 `compose` s2 `compose` s1)) (inferExpr e2)
         return (s4 `compose` s3 `compose` s2 `compose` s1, t2)
   ERecord fields -> do
     (ss, ts) <- unzip <$> mapM inferExpr (map snd fields)

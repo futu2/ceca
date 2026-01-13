@@ -23,8 +23,11 @@ typeCheckerTests = testGroup "TypeChecker" [
     testProperty "record with function" testRecordWithFunction,
      testProperty "type annotation" testAnnotation,
      testProperty "complex expression" testComplexExpr,
-     testProperty "unification error" testUnificationError
-  ]
+      testProperty "unification error" testUnificationError
+    , testProperty "builtin" testBuiltin
+    , testProperty "builtin annotation" testBuiltinAnnotation
+    , testProperty "let binding with annotation" testLetBindingAnnotation
+    ]
 
 testLiteralInt :: Property
 testLiteralInt = property $ do
@@ -123,12 +126,30 @@ testAnnotation = property $ do
 
 testUnificationError :: Property
 testUnificationError = property $ do
-    let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LInt 42))
-        e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LBool True))
-        e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp e1 e2)
-    case typeCheck e of
-        Left _ -> success
-        Right _ -> failure
+  let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LInt 42))
+      e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LBool True))
+      e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp e1 e2)
+  case typeCheck e of
+    Left _ -> success
+    Right _ -> failure
+
+testBuiltin :: Property
+testBuiltin = property $ do
+  let e = MkSpan (initialPos "dummy") (initialPos "dummy") (EBuiltin (pack "test"))
+  case typeCheck e of
+    Right t -> case typeNode t of
+      TVar _ -> success
+      _ -> failure
+    Left _ -> failure
+
+testBuiltinAnnotation :: Property
+testBuiltinAnnotation = property $ do
+  let e_inner = MkSpan (initialPos "dummy") (initialPos "dummy") (EBuiltin (pack "test"))
+      ty = MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pack "int"))
+      e = MkSpan (initialPos "dummy") (initialPos "dummy") (EAnnot e_inner ty)
+  case typeCheck e of
+    Right t -> typeNode t === TCon (pack "int")
+    Left _ -> failure
 
 testComplexExpr :: Property
 testComplexExpr = property $ do
@@ -142,4 +163,16 @@ testComplexExpr = property $ do
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lambda1 innerApp)
     case typeCheck e of
         Right _ -> success
+        Left _ -> failure
+
+testLetBindingAnnotation :: Property
+testLetBindingAnnotation = property $ do
+    let recordTy = MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend (pack "cino") (MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pack "string"))) (MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend (pack "accno") (MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pack "string"))) (MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend (pack "balance") (MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pack "float"))) (MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty))))))
+        e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (EBuiltin (pack "some_builtin"))
+        pat = MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "y"))
+        lambda = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs (MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "x"))) (MkSpan (initialPos "dummy") (initialPos "dummy") (EProj (MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))) (pack "cino"))))
+        e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lambda (MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "y"))))
+        e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet pat (Just recordTy) e1 e2)
+    case typeCheck e of
+        Right t -> typeNode t === TCon (pack "string")
         Left _ -> failure

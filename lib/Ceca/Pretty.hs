@@ -29,7 +29,7 @@ prettyExprNode :: ExprNode -> Doc ann
 prettyExprNode (EVar name) = pretty name
 prettyExprNode (ELit lit) = prettyLit lit
 prettyExprNode (EBuiltin name) = pretty "%%" <> pretty name <> pretty "%%"
-prettyExprNode (EAbs pat body) = prettyPat pat <+> pretty "=>" <+> prettyExpr body
+prettyExprNode (EAbs pat body) = pretty "(" <> prettyPat pat <+> pretty "=>" <+> prettyExpr body <> pretty ")"
 prettyExprNode (EApp e1 e2) = prettyExpr e1 <+> prettyExpr e2
 prettyExprNode (ERecord fields) =
   group $ braces $ align $ vsep $ punctuate comma $

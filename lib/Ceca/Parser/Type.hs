@@ -28,7 +28,7 @@ parseArrayType = TArray <$> brackets parseType
 parseTupleType :: Parser TypeNode
 parseTupleType = do
   types <- parens (parseType `sepBy1` symbol ",")
-  return $ TTuple types
+  if length types < 2 then empty else return $ TTuple types
 
 parseParensType :: Parser TypeNode
 parseParensType = parens parseTypeNode
@@ -41,9 +41,9 @@ parseBasicType =
     , TCon "float" <$ symbol "float"
     , TCon "bool" <$ symbol "bool"
     , try parseArrayType
+    , try parseParensType
     , try parseTupleType
     , try parseRecordType
-    , parseParensType
     ]
 
 parseArrowType :: Parser TypeNode

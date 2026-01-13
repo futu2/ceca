@@ -11,6 +11,8 @@ import Data.Text (pack)
 import System.Environment (getArgs)
 import System.FilePath (takeDirectory)
 import Text.Megaparsec (runParser)
+import Ceca.Pretty (prettyPrintExpr)
+import qualified Data.Text as T
 
 main :: IO ()
 main = do
@@ -27,6 +29,7 @@ processFile file = do
       Left parseErr -> putStrLn $ "Parse error: " ++ show parseErr
       Right expr -> do
         resolved <- resolveImports (takeDirectory file) expr
+        putStrLn $ T.unpack $ prettyPrintExpr resolved
         case typeCheck resolved of
           Left typeErr -> putStrLn $ "Type error: " ++ show typeErr
           Right ty -> do
