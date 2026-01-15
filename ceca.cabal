@@ -21,6 +21,7 @@ library
       Ceca.AST
       Ceca.Desugar
       Ceca.Importer
+      Ceca.LSP
       Ceca.Normalizer
       Ceca.Parser
       Ceca.Parser.Basic
@@ -65,6 +66,7 @@ executable ceca
     , filepath
     , megaparsec
     , mtl
+    , optparse-applicative
     , parser-combinators
     , text
   default-language: GHC2021
