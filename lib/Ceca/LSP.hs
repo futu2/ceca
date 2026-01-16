@@ -5,7 +5,7 @@
 
 module Ceca.LSP where
 
-import Ceca.AST (ExprNode(..), spanNode)
+import Ceca.AST (ExprNode(..), spanNode, Span(MkSpan), TypeNode(TRecordExtend, TRecordEmpty, TVar))
 import Ceca.Parser.Expr (parseExpr)
 import Ceca.TypeChecker (typeCheck)
 import Ceca.Types (decomposeRecord, typeNode)
@@ -89,9 +89,8 @@ completionHandler docState req responder = do
         case runParser parseExpr "" exprText of
           Left _ -> responder $ Right $ LSP.InR $ LSP.InR LSP.Null
           Right expr -> do
-            -- For now, hardcode fields for "r"
-            let fields = case spanNode expr of
-                  EVar "r" -> ["a", "b"]
-                  _ -> []
+            let fields = case typeCheck expr of
+                  Right typ -> let (fieldMap, _) = decomposeRecord (spanNode typ) in Map.keys fieldMap
+                  Left _ -> []
             let items = map (\f -> LSP.CompletionItem { _label = f, _kind = Nothing, _labelDetails = Nothing, _tags = Nothing, _detail = Nothing, _documentation = Nothing, _deprecated = Nothing, _preselect = Nothing, _sortText = Nothing, _filterText = Nothing, _insertText = Nothing, _insertTextFormat = Nothing, _insertTextMode = Nothing, _textEdit = Nothing, _textEditText = Nothing, _additionalTextEdits = Nothing, _commitCharacters = Nothing, _command = Nothing, _data_ = Nothing }) fields
             responder $ Right $ LSP.InR $ LSP.InL $ LSP.CompletionList False Nothing items
