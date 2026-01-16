@@ -44,6 +44,8 @@ library
     , filepath
     , megaparsec
     , mtl
+    , lsp
+    , lsp-types
     , parser-combinators
     , prettyprinter
     , text
