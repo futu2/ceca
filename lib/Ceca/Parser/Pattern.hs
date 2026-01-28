@@ -45,21 +45,13 @@ parseArrayPattern = do
 
 parseRecordPattern :: Parser PatternNode
 parseRecordPattern =
-  braces $
-    do
-      -- Check if empty
-      (lookAhead (void $ symbol "}") >> return (PRecord [] Nothing))
-      <|> do
-        -- Parse fields
-        fields <- manyTill parseRecordFieldPattern (lookAhead restOrEnd)
-        -- Parse optional rest
-        mrest <- optional $ do
-          void $ symbol "|"
-          pos <- getSourcePos
-          let defaultPat = MkSpan pos pos PWildcard
-          pat <- option defaultPat parsePattern
-          return pat
-        return $ PRecord fields mrest -- NO symbol "}" here!
+  braces $ do
+    fields <- manyTill parseRecordFieldPattern (lookAhead restOrEnd)
+    mrest <- optional $ do
+      void $ symbol "|"
+      pos <- getSourcePos
+      option (MkSpan pos pos PWildcard) parsePattern
+    return $ PRecord fields mrest
   where
     restOrEnd :: Parser ()
     restOrEnd = void (symbol "|") <|> void (symbol "}") -- For lookAhead only

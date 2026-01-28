@@ -10,7 +10,7 @@ import Text.Megaparsec
 import Ceca.Parser.Basic
 import Ceca.Parser.Pattern (parsePattern)
 import Ceca.Parser.Type
-import Control.Monad (guard, void)
+import Control.Monad (guard)
 
 -- Helper for binary application
 binary :: Text -> Expr -> Expr -> Expr
@@ -84,27 +84,35 @@ operatorTable =
     ]
   ]
 
+applyApp :: Expr -> Expr -> Expr
+applyApp func arg = MkSpan (spanStart func) (spanEnd arg) (EApp func arg)
+
+applyApps :: Expr -> [Expr] -> Expr
+applyApps = foldl' applyApp
+
 -- Parser for expressions without infix
 parseTerm :: Parser Expr
 parseTerm =
   choice
-    [ try (withSpan parseLambdaExpr)
-    , try (withSpan parseLetExpr)
-    , try (withSpan parseExtendRestrictExpr)
-    , try (withSpan parseRecordExpr)
-    , try (withSpan parseTupleExpr)
-    , try (withSpan parseArrayExpr)
-    , try (withSpan parseImportExpr)
+    [ spanned parseLambdaExpr
+    , spanned parseLetExpr
+    , spanned parseExtendRestrictExpr
+    , spanned parseRecordExpr
+    , spanned parseTupleExpr
+    , spanned parseArrayExpr
+    , spanned parseImportExpr
     , try parseProjExpr
-    , try (withSpan parseAppExpr)
+    , spanned parseAppExpr
     ]
+  where
+    spanned = try . withSpan
 
 parseAtomicExpr :: Parser Expr
 parseAtomicExpr =
   withSpan $
     choice
       [ try (EBuiltin <$> (symbol "%%" >> identifier <* symbol "%%"))
-      , try $ ELit <$> parseLiteral
+      , try (ELit <$> parseLiteral)
       , EVar <$> identifier
       , try parseRecordExpr
       , parens parseExprNode
@@ -113,8 +121,8 @@ parseAtomicExpr =
 parseProjExpr :: Parser Expr
 parseProjExpr = do
   expr <- parseAtomicExpr
-  more <- some parseProjSuffix
-  return $ foldl' (\e f -> f e) expr more
+  suffixes <- some parseProjSuffix
+  return $ foldl' (\e f -> f e) expr suffixes
   where
     parseProjSuffix :: Parser (Expr -> Expr)
     parseProjSuffix =
@@ -125,65 +133,42 @@ parseProjExpr = do
             return $ \e -> MkSpan (spanStart e) (spanEnd e) (EProj e name)
         , do
             args <- parens (some parseAtomicExpr)
-            return $ \e ->
-              foldl'
-                ( \f arg ->
-                    let start = spanStart f
-                        end = spanEnd arg
-                     in MkSpan start end (EApp f arg)
-                )
-                e
-                args
+            return $ \e -> applyApps e args
         ]
 
 parseExtendRestrictExpr :: Parser ExprNode
 parseExtendRestrictExpr = braces $ do
-  ops <- parseOps
+  ops <- many parseOp
   _ <- symbol "|"
   baseExpr <- parseExpr
-  let result = foldl applyOp baseExpr ops
-  return $ spanNode result
+  return $ spanNode (foldl' (\e op -> op e) baseExpr ops)
   where
-    parseOps :: Parser [Expr -> Expr]
-    parseOps =
-      many $
-        choice
-          [ do
-              opStart <- getSourcePos
-              _ <- symbol "-"
-              name <- identifier
-              -- opEnd <- getSourcePos
-              _ <- optional $ symbol ","
-              return $ \e ->
-                MkSpan opStart (spanEnd e) (ERestrict e name)
-          , do
-              opStart <- getSourcePos
-              name <- identifier
-              _ <- symbol "="
-              val <- parseExpr
-              -- opEnd <- getSourcePos
-              _ <- optional $ symbol ","
-              return $ \e ->
-                MkSpan opStart (spanEnd e) (EExtend e name val)
-          ]
-
-    applyOp :: Expr -> (Expr -> Expr) -> Expr
-    applyOp expr op = op expr
+    parseOp =
+      choice
+        [ do
+            opStart <- getSourcePos
+            _ <- symbol "-"
+            name <- identifier
+            _ <- optional $ symbol ","
+            return $ \e -> MkSpan opStart (spanEnd e) (ERestrict e name)
+        , do
+            opStart <- getSourcePos
+            name <- identifier
+            _ <- symbol "="
+            val <- parseExpr
+            _ <- optional $ symbol ","
+            return $ \e -> MkSpan opStart (spanEnd e) (EExtend e name val)
+        ]
 
 parseRecordExpr :: Parser ExprNode
 parseRecordExpr = braces $ do
-  -- Check if record is empty
-  isEmpty <- optional (lookAhead (void (symbol "}")))
-  case isEmpty of
-    Just _ -> return $ ERecord []
-    Nothing -> do
-      fields <- parseRecordField `sepBy` symbol ","
-      optional (symbol ",")
-      return $ ERecord fields
+  fields <- parseRecordField `sepBy` symbol ","
+  _ <- optional (symbol ",")
+  return $ ERecord fields
   where
     parseRecordField = do
       name <- identifier
-      symbol "="
+      _ <- symbol "="
       expr <- parseExpr
       return (name, expr)
 
@@ -207,12 +192,12 @@ parseLambdaExpr = do
 
 parseLetExpr :: Parser ExprNode
 parseLetExpr = do
-  symbol "let"
+  _ <- symbol "let"
   pat <- parsePattern
-  typ <- optional (symbol ":" >> parseType)
-  symbol "="
+  typ <- optional (symbol ":" *> parseType)
+  _ <- symbol "="
   val <- parseExpr
-  symbol ";"
+  _ <- symbol ";"
   body <- parseExpr
   return $ ELet pat typ val body
 
@@ -227,23 +212,10 @@ parseAppExpr :: Parser ExprNode
 parseAppExpr = do
   func <- parseAtomicExpr
   args <- many parseAtomicExpr
-  let resultExpr =
-        foldl'
-          ( \f arg ->
-              let start = spanStart f
-                  end = spanEnd arg
-               in MkSpan start end (EApp f arg)
-          )
-          func
-          args
-  return $ spanNode resultExpr
+  return $ spanNode (applyApps func args)
 
 parseExprNode :: Parser ExprNode
 parseExprNode = fmap spanNode parseExpr
 
 parseExpr :: Parser Expr
-parseExpr =
-  choice
-    [ try (withSpan parseAnnotExpr)
-    , makeExprParser parseTerm operatorTable
-    ]
+parseExpr = try (withSpan parseAnnotExpr) <|> makeExprParser parseTerm operatorTable
