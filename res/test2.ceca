@@ -1,5 +1,0 @@
-let y = {name = "yahoo1", no = 1} ;
-
-let __+__ = (x1 => x2 => (x1, x2));
-
-(x => (x.name, x.no + x.no)) {name = "yahoo1", no = @./imported.ceca}

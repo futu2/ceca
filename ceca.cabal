@@ -32,6 +32,11 @@ library
       Ceca.TypeChecker
       Ceca.Types
   other-modules:
+      Ceca.LSP.Completion
+      Ceca.LSP.Handlers
+      Ceca.LSP.Position
+      Ceca.LSP.Server
+      Ceca.LSP.Types
       Paths_ceca
   autogen-modules:
       Paths_ceca
