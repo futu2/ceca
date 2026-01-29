@@ -16,8 +16,11 @@ type Env = Map Text Scheme
 
 type TI a = ExceptT TypeError (ReaderT Env (StateT Int Identity)) a
 
+runTIWith :: Env -> TI a -> Either TypeError a
+runTIWith env ti = evalState (runReaderT (runExceptT ti) env) 0
+
 runTI :: TI a -> Either TypeError a
-runTI ti = evalState (runReaderT (runExceptT ti) Map.empty) 0
+runTI = runTIWith Map.empty
 
 fresh :: TI Type
 fresh = do
@@ -212,6 +215,9 @@ inferPat p = case spanNode p of
   _ -> error "pattern not implemented"
 
 typeCheck :: Expr -> Either TypeError Type
-typeCheck e = case runTI (inferExpr e) of
+typeCheck = typeCheckWithEnv Map.empty
+
+typeCheckWithEnv :: Env -> Expr -> Either TypeError Type
+typeCheckWithEnv env e = case runTIWith env (inferExpr e) of
   Left err -> Left err
   Right (s, t) -> Right (apply s t)

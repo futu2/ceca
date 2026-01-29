@@ -97,11 +97,11 @@ parseTerm =
     [ spanned parseLambdaExpr
     , spanned parseLetExpr
     , spanned parseExtendRestrictExpr
+    , try parseProjExpr
     , spanned parseRecordExpr
     , spanned parseTupleExpr
     , spanned parseArrayExpr
     , spanned parseImportExpr
-    , try parseProjExpr
     , spanned parseAppExpr
     ]
   where
@@ -130,7 +130,8 @@ parseProjExpr = do
         [ do
             _ <- symbol "."
             name <- identifier
-            return $ \e -> MkSpan (spanStart e) (spanEnd e) (EProj e name)
+            end <- getSourcePos
+            return $ \e -> MkSpan (spanStart e) end (EProj e name)
         , do
             args <- parens (some parseAtomicExpr)
             return $ \e -> applyApps e args

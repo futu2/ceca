@@ -1,0 +1,57 @@
+{
+  "name": "ceca-lsp",
+  "displayName": "Ceca Language Server",
+  "description": "VS Code language support for Ceca via its LSP server.",
+  "version": "0.0.1",
+  "publisher": "ceca-lang",
+  "license": "BSD-2-Clause-Patent",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:ceca"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "ceca",
+        "aliases": [
+          "Ceca"
+        ],
+        "extensions": [
+          ".ceca"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Ceca",
+      "properties": {
+        "ceca.serverPath": {
+          "type": "string",
+          "default": "ceca",
+          "description": "Path to the ceca executable."
+        },
+        "ceca.serverArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "--mode",
+            "lsp"
+          ],
+          "description": "Arguments passed to the ceca LSP server."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}
