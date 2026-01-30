@@ -27,6 +27,14 @@ typeCheckerTests = testGroup "TypeChecker" [
     , testProperty "builtin" testBuiltin
     , testProperty "builtin annotation" testBuiltinAnnotation
     , testProperty "let binding with annotation" testLetBindingAnnotation
+    , testProperty "extend expression" testExtendExpr
+    , testProperty "restrict expression" testRestrictExpr
+    , testProperty "wildcard pattern" testWildcardPattern
+    , testProperty "literal pattern" testLiteralPattern
+    , testProperty "array pattern" testArrayPattern
+    , testProperty "record rest pattern" testRecordRestPattern
+    , testProperty "empty array literal" testEmptyArrayLiteral
+    , testProperty "import expression" testImportExpr
     ]
 
 testLiteralInt :: Property
@@ -176,4 +184,119 @@ testLetBindingAnnotation = property $ do
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet pat (Just recordTy) e1 e2)
     case typeCheck e of
         Right t -> typeNode t === TCon (pack "string")
+        Left _ -> failure
+
+testExtendExpr :: Property
+testExtendExpr = property $ do
+    let pos = initialPos "dummy"
+        base =
+          MkSpan pos pos
+            (ERecord
+              [ (pack "x", MkSpan pos pos (ELit (LInt 1)))
+              , (pack "y", MkSpan pos pos (ELit (LBool True)))
+              ])
+        val = MkSpan pos pos (ELit (LInt 2))
+        e = MkSpan pos pos (EExtend base (pack "x") val)
+    case typeCheck e of
+        Right _ -> success
+        Left _ -> failure
+
+testRestrictExpr :: Property
+testRestrictExpr = property $ do
+    let pos = initialPos "dummy"
+        base =
+          MkSpan pos pos
+            (ERecord
+              [ (pack "x", MkSpan pos pos (ELit (LInt 1)))
+              , (pack "y", MkSpan pos pos (ELit (LBool True)))
+              ])
+        e = MkSpan pos pos (ERestrict base (pack "x"))
+    case typeCheck e of
+        Right _ -> success
+        Left _ -> failure
+
+testWildcardPattern :: Property
+testWildcardPattern = property $ do
+    let pos = initialPos "dummy"
+        pat = MkSpan pos pos PWildcard
+        e1 = MkSpan pos pos (ELit (LInt 1))
+        e2 = MkSpan pos pos (ELit (LBool True))
+        e = MkSpan pos pos (ELet pat Nothing e1 e2)
+    case typeCheck e of
+        Right t -> typeNode t === TCon (pack "bool")
+        Left _ -> failure
+
+testLiteralPattern :: Property
+testLiteralPattern = property $ do
+    let pos = initialPos "dummy"
+        pat = MkSpan pos pos (PLit (LInt 1))
+        e1 = MkSpan pos pos (ELit (LInt 1))
+        e2 = MkSpan pos pos (ELit (LBool True))
+        e = MkSpan pos pos (ELet pat Nothing e1 e2)
+    case typeCheck e of
+        Right t -> typeNode t === TCon (pack "bool")
+        Left _ -> failure
+
+testArrayPattern :: Property
+testArrayPattern = property $ do
+    let pos = initialPos "dummy"
+        pat =
+          MkSpan pos pos
+            (PArray
+              [ MkSpan pos pos (PVar (pack "x"))
+              , MkSpan pos pos (PVar (pack "y"))
+              ])
+        e1 =
+          MkSpan pos pos
+            (EArray
+              [ MkSpan pos pos (ELit (LInt 1))
+              , MkSpan pos pos (ELit (LInt 2))
+              ])
+        e2 = MkSpan pos pos (EVar (pack "x"))
+        e = MkSpan pos pos (ELet pat Nothing e1 e2)
+    case typeCheck e of
+        Right t -> typeNode t === TCon (pack "int")
+        Left _ -> failure
+
+testRecordRestPattern :: Property
+testRecordRestPattern = property $ do
+    let pos = initialPos "dummy"
+        pat =
+          MkSpan pos pos
+            (PRecord
+              [ (pack "x", MkSpan pos pos (PVar (pack "x"))) ]
+              (Just (MkSpan pos pos (PVar (pack "rest")))))
+        e1 =
+          MkSpan pos pos
+            (ERecord
+              [ (pack "x", MkSpan pos pos (ELit (LInt 1)))
+              , (pack "y", MkSpan pos pos (ELit (LBool True)))
+              ])
+        restVar = MkSpan pos pos (EVar (pack "rest"))
+        e2 = MkSpan pos pos (EProj restVar (pack "y"))
+        e = MkSpan pos pos (ELet pat Nothing e1 e2)
+    case typeCheck e of
+        Right t -> typeNode t === TCon (pack "bool")
+        Left _ -> failure
+
+testEmptyArrayLiteral :: Property
+testEmptyArrayLiteral = property $ do
+    let pos = initialPos "dummy"
+        e = MkSpan pos pos (EArray [])
+    case typeCheck e of
+        Right t -> case typeNode t of
+            TArray inner -> case typeNode inner of
+                TVar _ -> success
+                _ -> failure
+            _ -> failure
+        Left _ -> failure
+
+testImportExpr :: Property
+testImportExpr = property $ do
+    let pos = initialPos "dummy"
+        e = MkSpan pos pos (EImport "dummy.ceca")
+    case typeCheck e of
+        Right t -> case typeNode t of
+            TVar _ -> success
+            _ -> failure
         Left _ -> failure
