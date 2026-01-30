@@ -59,34 +59,51 @@ unifyRecords :: TypeNode -> TypeNode -> TI Subst
 unifyRecords r1 r2 = do
   let (m1, rest1) = decomposeRecord r1
       (m2, rest2) = decomposeRecord r2
-  let keys1 = Set.fromList (Map.keys m1)
+      keys1 = Set.fromList (Map.keys m1)
       keys2 = Set.fromList (Map.keys m2)
-  if keys1 == keys2 then do
-    s1 <- unifyMaps (Map.toList m1) (Map.toList m2)
-    s2 <- case (rest1, rest2) of
-      (Nothing, Nothing) -> return nullSubst
-      (Just v, Nothing) -> varBind v TRecordEmpty
-      (Nothing, Just v) -> varBind v TRecordEmpty
-      (Just v1, Just v2) -> unify' (TVar v1) (TVar v2)
-    return (s2 `compose` s1)
-  else if rest1 /= Nothing && rest2 == Nothing && keys1 `Set.isSubsetOf` keys2 then do
-    let common = keys1
-    s1 <- unifyMaps (Map.toList m1) (Map.toList (Map.restrictKeys m2 common))
-    let extra = Map.withoutKeys m2 common
-    let extraRecord = foldl (\acc (l, t) -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l (apply s1 t) acc)) (MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty) (Map.toList extra)
-    let Just v = rest1
-    s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v)) extraRecord
-    return (s2 `compose` s1)
-  else if rest2 /= Nothing && rest1 == Nothing && keys2 `Set.isSubsetOf` keys1 then do
-    let common = keys2
-    s1 <- unifyMaps (Map.toList (Map.restrictKeys m1 common)) (Map.toList m2)
-    let extra = Map.withoutKeys m1 common
-    let extraRecord = foldl (\acc (l, t) -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l (apply s1 t) acc)) (MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty) (Map.toList extra)
-    let Just v = rest2
-    s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v)) extraRecord
-    return (s2 `compose` s1)
-  else
-    throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") r1) (MkSpan (initialPos "dummy") (initialPos "dummy") r2))
+      common = Set.intersection keys1 keys2
+      emptyRecord = MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty
+      buildRecord fields tailRecord =
+        foldl
+          (\acc (l, t) -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l t acc))
+          tailRecord
+          fields
+  s1 <- unifyMaps (Map.toList (Map.restrictKeys m1 common)) (Map.toList (Map.restrictKeys m2 common))
+  let m1' = Map.map (apply s1) m1
+      m2' = Map.map (apply s1) m2
+      extra1 = Map.withoutKeys m1' common
+      extra2 = Map.withoutKeys m2' common
+  case (rest1, rest2) of
+    (Nothing, Nothing) ->
+      if Map.null extra1 && Map.null extra2
+        then return s1
+        else throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") r1) (MkSpan (initialPos "dummy") (initialPos "dummy") r2))
+    (Just v1, Nothing) ->
+      if Map.null extra1
+        then do
+          let extraRecord = buildRecord (Map.toList extra2) emptyRecord
+          s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v1)) extraRecord
+          return (s2 `compose` s1)
+        else throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") r1) (MkSpan (initialPos "dummy") (initialPos "dummy") r2))
+    (Nothing, Just v2) ->
+      if Map.null extra2
+        then do
+          let extraRecord = buildRecord (Map.toList extra1) emptyRecord
+          s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v2)) extraRecord
+          return (s2 `compose` s1)
+        else throwError (UnificationFail (MkSpan (initialPos "dummy") (initialPos "dummy") r1) (MkSpan (initialPos "dummy") (initialPos "dummy") r2))
+    (Just v1, Just v2) ->
+      if Map.null extra1 && Map.null extra2
+        then do
+          s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v1)) (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v2))
+          return (s2 `compose` s1)
+        else do
+          rowTail <- fresh
+          let extraRecord1 = buildRecord (Map.toList extra1) rowTail
+          let extraRecord2 = buildRecord (Map.toList extra2) rowTail
+          s2 <- unify (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v1)) extraRecord2
+          s3 <- unify (apply s2 (MkSpan (initialPos "dummy") (initialPos "dummy") (TVar v2))) (apply s2 extraRecord1)
+          return (s3 `compose` s2 `compose` s1)
 
 unifyMaps :: [(Text, Type)] -> [(Text, Type)] -> TI Subst
 unifyMaps [] [] = return nullSubst
