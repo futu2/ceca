@@ -97,7 +97,6 @@ parseTerm =
     [ spanned parseLambdaExpr
     , spanned parseLetExpr
     , spanned parseExtendRestrictExpr
-    , try parseProjExpr
     , spanned parseRecordExpr
     , spanned parseTupleExpr
     , spanned parseArrayExpr
@@ -118,23 +117,23 @@ parseAtomicExpr =
       , parens parseExprNode
       ]
 
-parseProjExpr :: Parser Expr
-parseProjExpr = do
+parsePostfixExpr :: Parser Expr
+parsePostfixExpr = do
   expr <- parseAtomicExpr
-  suffixes <- some parseProjSuffix
+  suffixes <- many parsePostfixSuffix
   return $ foldl' (\e f -> f e) expr suffixes
   where
-    parseProjSuffix :: Parser (Expr -> Expr)
-    parseProjSuffix =
+    parsePostfixSuffix :: Parser (Expr -> Expr)
+    parsePostfixSuffix =
       choice
-        [ do
+        [ try $ do
             _ <- symbol "."
             name <- identifier
             end <- getSourcePos
             return $ \e -> MkSpan (spanStart e) end (EProj e name)
         , do
-            args <- parens (some parseAtomicExpr)
-            return $ \e -> applyApps e args
+            arg <- parens parseExpr
+            return $ \e -> applyApp e arg
         ]
 
 parseExtendRestrictExpr :: Parser ExprNode
@@ -211,8 +210,8 @@ parseAnnotExpr = do
 
 parseAppExpr :: Parser ExprNode
 parseAppExpr = do
-  func <- parseAtomicExpr
-  args <- many parseAtomicExpr
+  func <- parsePostfixExpr
+  args <- many parsePostfixExpr
   return $ spanNode (applyApps func args)
 
 parseExprNode :: Parser ExprNode

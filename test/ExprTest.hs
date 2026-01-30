@@ -53,6 +53,7 @@ runUnitTestsExpr = do
   test_parseApplication
   test_parseApplicationLambdaToLambda
   test_parseApplicationLambdaToRecord
+  test_parseApplicationProjectionArg
   test_parseProjection
   test_parseLetExpr
   test_parseLetPattern
@@ -774,6 +775,22 @@ test_parseApplicationLambdaToRecord = do
         _ -> error "test_parseApplicationLambdaToRecord failed: Argument should be record"
     Right other -> error $ "test_parseApplicationLambdaToRecord failed: Expected EApp, got: " ++ show other
     Left err -> error $ "test_parseApplicationLambdaToRecord failed: " ++ errorBundlePretty err
+
+test_parseApplicationProjectionArg :: IO ()
+test_parseApplicationProjectionArg = do
+  let result = parse parseProgram "test" "f x.y"
+  case result of
+    Right (MkSpan _ _ (EApp func arg)) -> do
+      case spanNode func of
+        EVar "f" -> return ()
+        _ -> error "test_parseApplicationProjectionArg failed: Function should be f"
+      case spanNode arg of
+        EProj e "y" -> case spanNode e of
+          EVar "x" -> return ()
+          _ -> error "test_parseApplicationProjectionArg failed: Projection base should be x"
+        _ -> error "test_parseApplicationProjectionArg failed: Argument should be projection x.y"
+    Right other -> error $ "test_parseApplicationProjectionArg failed: Expected EApp, got: " ++ show other
+    Left err -> error $ "test_parseApplicationProjectionArg failed: " ++ errorBundlePretty err
 
 test_parseProjection :: IO ()
 test_parseProjection = do
