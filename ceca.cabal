@@ -22,6 +22,13 @@ library
       Ceca.Core
       Ceca.Importer
       Ceca.LSP
+      Ceca.LSP.Completion
+      Ceca.LSP.Diagnostics
+      Ceca.LSP.Handlers
+      Ceca.LSP.Position
+      Ceca.LSP.SemanticTokens
+      Ceca.LSP.Server
+      Ceca.LSP.Types
       Ceca.Normalizer
       Ceca.Parser
       Ceca.Parser.Basic
@@ -32,13 +39,6 @@ library
       Ceca.TypeChecker
       Ceca.Types
   other-modules:
-      Ceca.LSP.Completion
-      Ceca.LSP.Diagnostics
-      Ceca.LSP.Handlers
-      Ceca.LSP.Position
-      Ceca.LSP.Server
-      Ceca.LSP.SemanticTokens
-      Ceca.LSP.Types
       Paths_ceca
   autogen-modules:
       Paths_ceca
@@ -49,10 +49,10 @@ library
       base ==4.*
     , containers
     , filepath
-    , megaparsec
-    , mtl
     , lsp
     , lsp-types
+    , megaparsec
+    , mtl
     , parser-combinators
     , prettyprinter
     , text

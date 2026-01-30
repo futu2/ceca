@@ -29,6 +29,8 @@
           "text"
           "uniplate"
           "prettyprinter"
+          "lsp"
+          "lsp-types"
         ];
       };
 
@@ -41,6 +43,8 @@
           "mtl"
           "parser-combinators"
           "text"
+          "optparse-applicative"
+
         ];
       };
 
