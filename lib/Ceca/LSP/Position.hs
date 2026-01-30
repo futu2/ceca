@@ -2,15 +2,18 @@
 
 module Ceca.LSP.Position
   ( positionToOffset
+  , offsetToPosition
   , posInSpan
   , posLeq
   , posGeq
   , lspPositionToLineCol
+  , sourcePosToPosition
+  , spanToRange
   ) where
 
 import Ceca.AST (Span, spanEnd, spanStart)
 import Data.Text qualified as T
-import Language.LSP.Protocol.Types (Position(..))
+import Language.LSP.Protocol.Types (Position(..), Range(..))
 import Text.Megaparsec.Pos (SourcePos, sourceColumn, sourceLine, unPos)
 
 positionToOffset :: T.Text -> Position -> Int
@@ -31,6 +34,17 @@ positionToOffset text pos =
                (l:_) -> l
              col = min charIndex (T.length currentLine)
          in preLen + col
+
+offsetToPosition :: T.Text -> Int -> Position
+offsetToPosition text offset =
+  let clamped = max 0 (min offset (T.length text))
+      (before, _) = T.splitAt clamped text
+      lines = T.splitOn "\n" before
+      lineIndex = max 0 (length lines - 1)
+      colIndex = case reverse lines of
+        [] -> 0
+        (l:_) -> T.length l
+  in Position { _line = fromIntegral lineIndex, _character = fromIntegral colIndex }
 
 posInSpan :: Position -> Span a -> Bool
 posInSpan pos span =
@@ -54,3 +68,16 @@ posGeq (line, col) sp =
 lspPositionToLineCol :: Position -> (Int, Int)
 lspPositionToLineCol Position { _line = line, _character = ch } =
   (fromIntegral line + 1, fromIntegral ch + 1)
+
+sourcePosToPosition :: SourcePos -> Position
+sourcePosToPosition sp =
+  let line = unPos (sourceLine sp) - 1
+      col = unPos (sourceColumn sp) - 1
+  in Position { _line = fromIntegral (max 0 line), _character = fromIntegral (max 0 col) }
+
+spanToRange :: Span a -> Range
+spanToRange span =
+  Range
+    { _start = sourcePosToPosition (spanStart span)
+    , _end = sourcePosToPosition (spanEnd span)
+    }

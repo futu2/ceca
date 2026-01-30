@@ -48,6 +48,7 @@ testUnboundVar = property $ do
     let e = MkSpan undefined undefined (EVar (pack "x"))
     case typeCheck e of
         Left (UnboundVariable _) -> success
+        Left (TypeErrorAt _ (UnboundVariable _)) -> success
         _ -> failure
 
 testRecord :: Property

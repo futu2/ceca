@@ -23,6 +23,7 @@ data TypeError
   = UnificationFail Type Type
   | InfiniteType Text Type
   | UnboundVariable Text
+  | TypeErrorAt (Span ExprNode) TypeError
   deriving (Show, Eq)
 
 nullSubst :: Subst

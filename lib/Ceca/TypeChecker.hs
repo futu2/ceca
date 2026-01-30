@@ -119,7 +119,7 @@ litType (LString _) = MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pa
 litType (LBool _) = MkSpan (initialPos "dummy") (initialPos "dummy") (TCon (pack "bool"))
 
 inferExpr :: Expr -> TI (Subst, Type)
-inferExpr e = case spanNode e of
+inferExpr e = withExprSpan e $ case spanNode e of
   ELit l -> return (nullSubst, litType l)
   EBuiltin _ -> do
     tv <- fresh
@@ -188,6 +188,12 @@ inferExpr e = case spanNode e of
     s2 <- unify t1 rowType
     return (s2 `compose` s1, apply s2 tv)
   _ -> error "not implemented"
+
+withExprSpan :: Expr -> TI a -> TI a
+withExprSpan expr action =
+  catchError action $ \err -> case err of
+    TypeErrorAt _ _ -> throwError err
+    _ -> throwError (TypeErrorAt expr err)
 
 inferPat :: Pattern -> TI (Subst, Type, Env)
 inferPat p = case spanNode p of

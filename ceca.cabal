@@ -33,6 +33,7 @@ library
       Ceca.Types
   other-modules:
       Ceca.LSP.Completion
+      Ceca.LSP.Diagnostics
       Ceca.LSP.Handlers
       Ceca.LSP.Position
       Ceca.LSP.Server
