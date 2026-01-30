@@ -55,6 +55,13 @@ unifyList :: [Type] -> [Type] -> TI Subst
 unifyList [] [] = return nullSubst
 unifyList _ _ = error "unifyList called with mismatched lengths"
 
+unifyAll :: [Type] -> Type -> TI Subst
+unifyAll [] _ = return nullSubst
+unifyAll (t:ts) target = do
+  s1 <- unify t target
+  s2 <- unifyAll (map (apply s1) ts) (apply s1 target)
+  return (s2 `compose` s1)
+
 unifyRecords :: TypeNode -> TypeNode -> TI Subst
 unifyRecords r1 r2 = do
   let (m1, rest1) = decomposeRecord r1
@@ -191,7 +198,9 @@ inferExpr e = withExprSpan e $ case spanNode e of
   EArray es -> do
     (ss, ts) <- unzip <$> mapM inferExpr es
     let s = foldr compose nullSubst ss
-        t = head (map (apply s) ts) -- assume all same, but for simplicity
+    t <- case ts of
+      [] -> fresh
+      _ -> pure (head (map (apply s) ts)) -- assume all same, but for simplicity
     return (s, MkSpan (initialPos "dummy") (initialPos "dummy") (TArray t))
   EAnnot e ty -> do
     (s1, t) <- inferExpr e
@@ -204,7 +213,25 @@ inferExpr e = withExprSpan e $ case spanNode e of
     let rowType = MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l tv rowVar)
     s2 <- unify t1 rowType
     return (s2 `compose` s1, apply s2 tv)
-  _ -> error "not implemented"
+  EExtend e l val -> do
+    (s1, t1) <- inferExpr e
+    (s2, tVal) <- local (apply s1) (inferExpr val)
+    tv <- fresh
+    rowVar <- fresh
+    let rowType = MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l tv rowVar)
+    s3 <- unify (apply s2 t1) rowType
+    s4 <- unify (apply s3 tVal) (apply s3 tv)
+    return (s4 `compose` s3 `compose` s2 `compose` s1, apply s4 rowType)
+  ERestrict e l -> do
+    (s1, t1) <- inferExpr e
+    tv <- fresh
+    rowVar <- fresh
+    let rowType = MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l tv rowVar)
+    s2 <- unify t1 rowType
+    return (s2 `compose` s1, apply s2 rowVar)
+  EImport _ -> do
+    tv <- fresh
+    return (nullSubst, tv)
 
 withExprSpan :: Expr -> TI a -> TI a
 withExprSpan expr action =
@@ -217,25 +244,43 @@ inferPat p = case spanNode p of
   PVar x -> do
     tv <- fresh
     return (nullSubst, tv, Map.singleton x (Forall [] tv))
+  PWildcard -> do
+    tv <- fresh
+    return (nullSubst, tv, Map.empty)
+  PLit lit -> return (nullSubst, litType lit, Map.empty)
   PTuple ps -> do
     (ss, ts, envs) <- unzip3 <$> mapM inferPat ps
     let s = foldr compose nullSubst ss
         t = MkSpan (initialPos "dummy") (initialPos "dummy") (TTuple (map (apply s) ts))
         env = foldr (Map.union . apply s) Map.empty envs
     return (s, t, env)
-  PRecord fields mrest -> case mrest of
-    Nothing -> do
-      (ss, ts, envs) <- unzip3 <$> mapM inferPat (map snd fields)
-      let s = foldr compose nullSubst ss
-          env = foldr (Map.union . apply s) Map.empty envs
-          t =
-            foldl
-              (\r (l, t') -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l (apply s t') r))
-              (MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty)
-              (zip (map fst fields) ts)
-      return (s, t, env)
-    Just _ -> error "rest pattern not implemented"
-  _ -> error "pattern not implemented"
+  PArray ps -> do
+    (ss, ts, envs) <- unzip3 <$> mapM inferPat ps
+    let s0 = foldr compose nullSubst ss
+    tv <- fresh
+    s1 <- unifyAll (map (apply s0) ts) tv
+    let s = s1 `compose` s0
+        env = foldr (Map.union . apply s) Map.empty envs
+        t = MkSpan (initialPos "dummy") (initialPos "dummy") (TArray (apply s tv))
+    return (s, t, env)
+  PRecord fields mrest -> do
+    (ss, ts, envs) <- unzip3 <$> mapM inferPat (map snd fields)
+    let s0 = foldr compose nullSubst ss
+        envFields = foldr (Map.union . apply s0) Map.empty envs
+    (sRest, restType, envRest) <- case mrest of
+      Nothing ->
+        return (nullSubst, MkSpan (initialPos "dummy") (initialPos "dummy") TRecordEmpty, Map.empty)
+      Just restPat -> inferPat restPat
+    let s = sRest `compose` s0
+        restType' = apply s restType
+        fieldTypes = map (apply s) ts
+        t =
+          foldl
+            (\r (l, t') -> MkSpan (initialPos "dummy") (initialPos "dummy") (TRecordExtend l t' r))
+            restType'
+            (zip (map fst fields) fieldTypes)
+        env = Map.union (apply s envFields) (apply s envRest)
+    return (s, t, env)
 
 typeCheck :: Expr -> Either TypeError Type
 typeCheck = typeCheckWithEnv Map.empty

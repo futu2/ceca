@@ -37,6 +37,7 @@ library
       Ceca.LSP.Handlers
       Ceca.LSP.Position
       Ceca.LSP.Server
+      Ceca.LSP.SemanticTokens
       Ceca.LSP.Types
       Paths_ceca
   autogen-modules:

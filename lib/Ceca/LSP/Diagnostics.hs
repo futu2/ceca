@@ -5,12 +5,13 @@ module Ceca.LSP.Diagnostics
   , clearDiagnosticsForDoc
   ) where
 
-import Ceca.AST (ExprNode, Span, Type, spanEnd, spanStart)
+import Ceca.AST (Expr, ExprNode(..), Span, Type, spanEnd, spanStart, spanNode)
+import Ceca.Importer (resolveImports)
 import Ceca.LSP.Position (offsetToPosition, positionToOffset, sourcePosToPosition)
 import Ceca.Parser (parseProgram)
 import Ceca.TypeChecker (typeCheck)
 import Ceca.Types (TypeError(..))
-import Control.Exception (SomeException, displayException, evaluate, try)
+import Control.Exception (SomeException, displayException, evaluate, toException, try)
 import Control.Monad.IO.Class (liftIO)
 import Data.List.NonEmpty qualified as NE
 import Data.Map qualified as Map
@@ -19,12 +20,13 @@ import Language.LSP.Diagnostics (DiagnosticsBySource, partitionBySource)
 import Language.LSP.Protocol.Types (Diagnostic(..), DiagnosticSeverity(..), Position(..), Range(..))
 import Language.LSP.Protocol.Types qualified as LSP
 import Language.LSP.Server (LspM, publishDiagnostics)
+import System.FilePath (takeDirectory)
 import Text.Megaparsec (ParseErrorBundle, runParser, bundleErrors)
 import Text.Megaparsec.Error (ParseError(..))
 
 publishDiagnosticsForDoc :: LSP.Uri -> T.Text -> LspM () ()
 publishDiagnosticsForDoc uri text = do
-  diagnostics <- liftIO $ diagnosticsForTextIO text
+  diagnostics <- liftIO $ diagnosticsForTextIO uri text
   let bySource = diagnosticsBySource diagnostics
   publishDiagnostics maxDiagnostics (LSP.toNormalizedUri uri) Nothing bySource
 
@@ -35,16 +37,49 @@ clearDiagnosticsForDoc uri =
 maxDiagnostics :: Int
 maxDiagnostics = 100
 
-diagnosticsForTextIO :: T.Text -> IO [LSP.Diagnostic]
-diagnosticsForTextIO text =
-  case runParser parseProgram "<lsp>" text of
+diagnosticsForTextIO :: LSP.Uri -> T.Text -> IO [LSP.Diagnostic]
+diagnosticsForTextIO uri text =
+  let sourceName = case LSP.uriToFilePath uri of
+        Just path -> path
+        Nothing -> "<lsp>"
+  in case runParser parseProgram sourceName text of
     Left bundle -> pure [parseErrorDiagnostic text bundle]
     Right expr -> do
-      result <- try (evaluate (typeCheck expr)) :: IO (Either SomeException (Either TypeError Type))
-      case result of
-        Left err -> pure [internalErrorDiagnostic text err]
-        Right (Left err) -> pure [typeErrorDiagnostic text err]
-        Right (Right _) -> pure []
+      resolved <- resolveImportsForDiagnostics uri expr
+      case resolved of
+        Left err -> pure [importErrorDiagnostic text err]
+        Right resolvedExpr -> do
+          result <- try (evaluate (typeCheck resolvedExpr)) :: IO (Either SomeException (Either TypeError Type))
+          case result of
+            Left err -> pure [internalErrorDiagnostic text err]
+            Right (Left err) -> pure [typeErrorDiagnostic text err]
+            Right (Right _) -> pure []
+
+resolveImportsForDiagnostics :: LSP.Uri -> Expr -> IO (Either SomeException Expr)
+resolveImportsForDiagnostics uri expr =
+  case LSP.uriToFilePath uri of
+    Nothing ->
+      if exprHasImport expr
+        then pure $ Left (toException (userError "Cannot resolve imports for non-file URI"))
+        else pure $ Right expr
+    Just path -> try (resolveImports (takeDirectory path) expr)
+
+exprHasImport :: Expr -> Bool
+exprHasImport expr = case spanNode expr of
+  EImport _ -> True
+  EVar _ -> False
+  ELit _ -> False
+  EBuiltin _ -> False
+  EAbs _ body -> exprHasImport body
+  EApp e1 e2 -> exprHasImport e1 || exprHasImport e2
+  ERecord fields -> any (exprHasImport . snd) fields
+  ETuple es -> any exprHasImport es
+  EArray es -> any exprHasImport es
+  EProj e _ -> exprHasImport e
+  EExtend e1 _ e2 -> exprHasImport e1 || exprHasImport e2
+  ERestrict e _ -> exprHasImport e
+  ELet _ _ e1 e2 -> exprHasImport e1 || exprHasImport e2
+  EAnnot e _ -> exprHasImport e
 
 parseErrorDiagnostic :: T.Text -> ParseErrorBundle T.Text e -> LSP.Diagnostic
 parseErrorDiagnostic text bundle =
@@ -122,6 +157,10 @@ mkDiagnostic range message =
 internalErrorDiagnostic :: T.Text -> SomeException -> LSP.Diagnostic
 internalErrorDiagnostic text err =
   mkDiagnostic (fallbackRange text) ("Internal error: " <> T.pack (displayException err))
+
+importErrorDiagnostic :: T.Text -> SomeException -> LSP.Diagnostic
+importErrorDiagnostic text err =
+  mkDiagnostic (fallbackRange text) ("Import error: " <> T.pack (displayException err))
 
 diagnosticsBySource :: [LSP.Diagnostic] -> DiagnosticsBySource
 diagnosticsBySource diagnostics

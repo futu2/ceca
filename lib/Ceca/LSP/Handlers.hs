@@ -9,6 +9,7 @@ module Ceca.LSP.Handlers
 import Ceca.LSP.Completion (completionHandler)
 import Ceca.LSP.Diagnostics (clearDiagnosticsForDoc, publishDiagnosticsForDoc)
 import Ceca.LSP.Position (positionToOffset)
+import Ceca.LSP.SemanticTokens (semanticTokensHandler, semanticTokensRegistrationOptions)
 import Ceca.LSP.Types (DocState)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef, readIORef)
@@ -16,20 +17,20 @@ import Data.Map qualified as Map
 import Data.Text qualified as T
 import Language.LSP.Protocol.Message
 import Language.LSP.Protocol.Types qualified as LSP
-import Language.LSP.Server (Handlers, LspM, notificationHandler, requestHandler)
+import Language.LSP.Server (Handlers, LspM, notificationHandler, registerCapability, requestHandler)
 
 -- LSP handlers for Ceca language
 handlers :: DocState -> Handlers (LspM ())
 handlers docState =
   mconcat
-     [ notificationHandler SMethod_TextDocumentDidOpen $ \not -> do
-         let params = case not of TNotificationMessage _ _ p -> p
+     [ notificationHandler SMethod_TextDocumentDidOpen $ \notif -> do
+         let params = case notif of TNotificationMessage _ _ p -> p
              LSP.DidOpenTextDocumentParams { _textDocument = textDoc } = params
              LSP.TextDocumentItem { _uri = uri, _text = text } = textDoc
          liftIO $ modifyIORef docState $ Map.insert uri text
          publishDiagnosticsForDoc uri text
-     , notificationHandler SMethod_TextDocumentDidChange $ \not -> do
-         let params = case not of TNotificationMessage _ _ p -> p
+     , notificationHandler SMethod_TextDocumentDidChange $ \notif -> do
+         let params = case notif of TNotificationMessage _ _ p -> p
              LSP.DidChangeTextDocumentParams { _textDocument = docId, _contentChanges = contentChanges } = params
              LSP.VersionedTextDocumentIdentifier { _uri = uri } = docId
          newText <- liftIO $ do
@@ -39,15 +40,18 @@ handlers docState =
            modifyIORef docState $ Map.insert uri newText
            return newText
          publishDiagnosticsForDoc uri newText
-     , notificationHandler SMethod_TextDocumentDidClose $ \not -> do
-         let params = case not of TNotificationMessage _ _ p -> p
+     , notificationHandler SMethod_TextDocumentDidClose $ \notif -> do
+         let params = case notif of TNotificationMessage _ _ p -> p
              LSP.DidCloseTextDocumentParams { _textDocument = textDoc } = params
              LSP.TextDocumentIdentifier { _uri = uri } = textDoc
          liftIO $ modifyIORef docState $ Map.delete uri
          clearDiagnosticsForDoc uri
-     , notificationHandler SMethod_Initialized $ \_not -> pure ()
+     , notificationHandler SMethod_Initialized $ \_notif -> do
+         _ <- registerCapability mempty SMethod_TextDocumentSemanticTokensFull semanticTokensRegistrationOptions (semanticTokensHandler docState)
+         pure ()
      , notificationHandler SMethod_WorkspaceDidChangeConfiguration $ \_not -> pure ()
      , requestHandler SMethod_TextDocumentCompletion $ completionHandler docState
+     , requestHandler SMethod_TextDocumentSemanticTokensFull $ semanticTokensHandler docState
      ]
 
 applyContentChange :: T.Text -> LSP.TextDocumentContentChangeEvent -> T.Text
