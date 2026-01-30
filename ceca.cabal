@@ -19,7 +19,7 @@ library
   exposed-modules:
       Ceca
       Ceca.AST
-      Ceca.Desugar
+      Ceca.Core
       Ceca.Importer
       Ceca.LSP
       Ceca.Normalizer

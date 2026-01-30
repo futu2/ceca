@@ -1,11 +1,10 @@
 module Main (main) where
 
-import Ceca.Desugar (desugar, unCore)
+import Ceca.Core (desugar)
 import Ceca.Importer (resolveImports)
 import Ceca.Normalizer (normalize)
 import Ceca.Parser (parseProgram)
 import Ceca.TypeChecker (typeCheck)
-import Ceca.Types (TypeError)
 import qualified Data.Set as Set
 import Data.Text (pack)
 import System.Environment (getArgs)
@@ -79,10 +78,12 @@ processFile file = do
           Left typeErr -> putStrLn $ "Type error: " ++ show typeErr
           Right ty -> do
             putStrLn $ "Type: " ++ show ty
-            let core = desugar resolved
-                normalized = normalize core
-            putStrLn $ "Normalized core AST:"
-            putStrLn $ show (unCore normalized)
+            case desugar resolved of
+              Left err -> putStrLn $ "Core desugar error: " ++ show err
+              Right core -> do
+                let normalized = normalize core
+                putStrLn $ "Normalized core AST:"
+                putStrLn $ show normalized
 
 typeCheckFile :: FilePath -> IO ()
 typeCheckFile file = do

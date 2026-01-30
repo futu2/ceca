@@ -4,7 +4,7 @@ import Test.Tasty
 import Test.Tasty.Hedgehog
 import Hedgehog
 import Ceca.AST
-import Ceca.Desugar
+import Ceca.Core
 import Ceca.Normalizer
 import Data.Text (pack)
 import Text.Megaparsec.Pos (initialPos)
@@ -23,10 +23,11 @@ testIdentityApplication = property $ do
         arg = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LInt 42))
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lam arg)
         core = desugar e
-        normalized = normalize core
-    case coreExpr (unCore normalized) of
-        Just _ -> success
-        Nothing -> failure
+    case core of
+        Left _ -> failure
+        Right coreExpr -> case normalize coreExpr of
+            CoreExpr _ (CLit (LInt n)) | n == 42 -> success
+            _ -> failure
 
 testRecordProjection :: Property
 testRecordProjection = property $ do
@@ -36,9 +37,8 @@ testRecordProjection = property $ do
         rec = MkSpan (initialPos "dummy") (initialPos "dummy") (ERecord [(pack "name", MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LString (pack "yahoo"))))])
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EApp lam rec)
         core = desugar e
-        normalized = normalize core
-    case coreExpr (unCore normalized) of
-        Just (CoreExpr innerExpr) -> case spanNode innerExpr of
-            ELit (LString s) | s == pack "yahoo" -> success
+    case core of
+        Left _ -> failure
+        Right coreExpr -> case normalize coreExpr of
+            CoreExpr _ (CLit (LString s)) | s == pack "yahoo" -> success
             _ -> failure
-        Nothing -> failure

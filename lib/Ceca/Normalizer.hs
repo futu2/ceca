@@ -1,40 +1,57 @@
 module Ceca.Normalizer where
 
-import Data.Text (Text)
-import qualified Data.Set as Set
+import Ceca.Core
 import Data.List (lookup)
-import Ceca.AST
-import Ceca.Desugar
+import Data.Text (Text, unpack)
+import Text.Read (readMaybe)
 
 normalize :: CoreExpr -> CoreExpr
-normalize (CoreExpr e) = CoreExpr $ normalizeExpr e
+normalize = normalizeExpr
 
-normalizeExpr :: Expr -> Expr
-normalizeExpr e = case spanNode e of {
-    EApp e1 e2 -> case spanNode (normalizeExpr e1) of {
-        EAbs (MkSpan _ _ (PVar x)) body -> normalizeExpr $ substitute x (normalizeExpr e2) body ;
-        _ -> let e1' = normalizeExpr e1
-                 e2' = normalizeExpr e2
-             in e { spanNode = EApp e1' e2' }
-        } ;
-    EAbs pat body -> e { spanNode = EAbs pat (normalizeExpr body) } ;
-    ELet x mty e1 e2 -> e { spanNode = ELet x mty (normalizeExpr e1) (normalizeExpr e2) } ;
-    ERecord fields -> e { spanNode = ERecord (map (\(l, ex) -> (l, normalizeExpr ex)) fields) } ;
-    ETuple es -> e { spanNode = ETuple (map normalizeExpr es) } ;
-    EArray es -> e { spanNode = EArray (map normalizeExpr es) } ;
-    EProj ex l -> let ex' = normalizeExpr ex in case spanNode ex' of { ERecord fields -> case lookup l fields of { Just val -> normalizeExpr val ; Nothing -> e { spanNode = EProj ex' l } } ; _ -> e { spanNode = EProj ex' l } } ;
-    EAnnot ex ty -> e { spanNode = EAnnot (normalizeExpr ex) ty } ;
-    _ -> e }
+normalizeExpr :: CoreExpr -> CoreExpr
+normalizeExpr e@(CoreExpr t node) = case node of
+  CApp e1 e2 -> case coreNode (normalizeExpr e1) of
+    CAbs x body -> normalizeExpr $ substitute x (normalizeExpr e2) body
+    _ ->
+      let e1' = normalizeExpr e1
+          e2' = normalizeExpr e2
+       in CoreExpr t (CApp e1' e2')
+  CAbs x body -> CoreExpr t (CAbs x (normalizeExpr body))
+  CRecord fields ->
+    CoreExpr t (CRecord (map (\(l, ex) -> (l, normalizeExpr ex)) fields))
+  CTuple es -> CoreExpr t (CTuple (map normalizeExpr es))
+  CArray es -> CoreExpr t (CArray (map normalizeExpr es))
+  CProj ex l ->
+    let ex' = normalizeExpr ex
+     in case coreNode ex' of
+          CRecord fields -> case lookup l fields of
+            Just val -> normalizeExpr val
+            Nothing -> CoreExpr t (CProj ex' l)
+          CTuple es -> case parseIndex l of
+            Just i | i >= 0 && i < length es -> normalizeExpr (es !! i)
+            _ -> CoreExpr t (CProj ex' l)
+          _ -> CoreExpr t (CProj ex' l)
+  CExtend ex l val -> CoreExpr t (CExtend (normalizeExpr ex) l (normalizeExpr val))
+  CRestrict ex l -> CoreExpr t (CRestrict (normalizeExpr ex) l)
+  CAnnot ex ty -> CoreExpr t (CAnnot (normalizeExpr ex) ty)
+  _ -> e
 
-substitute :: Text -> Expr -> Expr -> Expr
-substitute x replacement e = case spanNode e of
-    EVar y | x == y -> replacement
-    EApp e1 e2 -> e { spanNode = EApp (substitute x replacement e1) (substitute x replacement e2) }
-    EAbs pat body -> e { spanNode = EAbs pat (substitute x replacement body) }
-    ELet y mty e1 e2 -> e { spanNode = ELet y mty (substitute x replacement e1) (substitute x replacement e2) }
-    ERecord fields -> e { spanNode = ERecord (map (\(l, ex) -> (l, substitute x replacement ex)) fields) }
-    ETuple es -> e { spanNode = ETuple (map (substitute x replacement) es) }
-    EArray es -> e { spanNode = EArray (map (substitute x replacement) es) }
-    EProj ex l -> e { spanNode = EProj (substitute x replacement ex) l }
-    EAnnot ex ty -> e { spanNode = EAnnot (substitute x replacement ex) ty }
-    _ -> e
+substitute :: Text -> CoreExpr -> CoreExpr -> CoreExpr
+substitute x replacement e@(CoreExpr t node) = case node of
+  CVar y | x == y -> replacement
+  CAbs y body
+    | x == y -> e
+    | otherwise -> CoreExpr t (CAbs y (substitute x replacement body))
+  CApp e1 e2 -> CoreExpr t (CApp (substitute x replacement e1) (substitute x replacement e2))
+  CRecord fields ->
+    CoreExpr t (CRecord (map (\(l, ex) -> (l, substitute x replacement ex)) fields))
+  CTuple es -> CoreExpr t (CTuple (map (substitute x replacement) es))
+  CArray es -> CoreExpr t (CArray (map (substitute x replacement) es))
+  CProj ex l -> CoreExpr t (CProj (substitute x replacement ex) l)
+  CExtend ex l val -> CoreExpr t (CExtend (substitute x replacement ex) l (substitute x replacement val))
+  CRestrict ex l -> CoreExpr t (CRestrict (substitute x replacement ex) l)
+  CAnnot ex ty -> CoreExpr t (CAnnot (substitute x replacement ex) ty)
+  _ -> e
+
+parseIndex :: Text -> Maybe Int
+parseIndex = readMaybe . unpack

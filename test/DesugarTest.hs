@@ -4,7 +4,7 @@ import Test.Tasty
 import Test.Tasty.Hedgehog
 import Hedgehog
 import Ceca.AST
-import Ceca.Desugar
+import Ceca.Core
 import Data.Text (pack)
 import Text.Megaparsec.Pos (initialPos)
 
@@ -22,9 +22,9 @@ testIdentityLambda = property $ do
         body = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body)
         desugared = desugar e
-    case coreExpr (unCore desugared) of
-        Just _ -> success
-        Nothing -> failure
+    case desugared of
+        Right _ -> success
+        Left _ -> failure
 
 testTuplePattern :: Property
 testTuplePattern = property $ do
@@ -34,9 +34,9 @@ testTuplePattern = property $ do
         body = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body)
         desugared = desugar e
-    case coreExpr (unCore desugared) of
-        Just _ -> success
-        Nothing -> failure
+    case desugared of
+        Right _ -> success
+        Left _ -> failure
 
 testRecordPattern :: Property
 testRecordPattern = property $ do
@@ -46,16 +46,16 @@ testRecordPattern = property $ do
         body = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (EAbs pat body)
         desugared = desugar e
-    case coreExpr (unCore desugared) of
-        Just _ -> success
-        Nothing -> failure
+    case desugared of
+        Right _ -> success
+        Left _ -> failure
 
 testLetDesugaring :: Property
 testLetDesugaring = property $ do
-    let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "y"))
+    let e1 = MkSpan (initialPos "dummy") (initialPos "dummy") (ELit (LInt 1))
         e2 = MkSpan (initialPos "dummy") (initialPos "dummy") (EVar (pack "x"))
         e = MkSpan (initialPos "dummy") (initialPos "dummy") (ELet (MkSpan (initialPos "dummy") (initialPos "dummy") (PVar (pack "x"))) Nothing e1 e2)
         desugared = desugar e
-    case coreExpr (unCore desugared) of
-        Just _ -> success
-        Nothing -> failure
+    case desugared of
+        Right _ -> success
+        Left _ -> failure
